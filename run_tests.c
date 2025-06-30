@@ -77,7 +77,7 @@ static void roda_teste_parseia_toda_a_gramatica() {
   printf("Testando se toda a gramática é parseada corretamente. Arquivo: tudo.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -98,7 +98,7 @@ static void roda_teste_salva_callee_saveds() {
   }
   printf("Testando se callee-saveds são preservados...\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   unsigned long rbx, r12, r13, r14, r15;
@@ -155,7 +155,7 @@ static void roda_teste_retorno_zero() {
   printf("Testando retorno de constante zero. Arquivo: retorno_zero.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -184,7 +184,7 @@ static void roda_teste_retorno_constante() {
   printf("Testando retorno de constante qualquer. Arquivo: retorno_constante.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -213,7 +213,7 @@ static void roda_teste_retorno_de_um_param() {
   printf("Testando retorno de um param . Arquivo: retorno_de_um_param.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -242,7 +242,7 @@ static void roda_teste_retorno_variavel() {
   printf("Testando retorno de uma variável local. Arquivo: retorno_variavel.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -271,7 +271,7 @@ static void roda_teste_overflow() {
   printf("Testando overflow de INT_MAX em INT_MIN. Arquivo: overflow_1.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -291,7 +291,7 @@ static void roda_teste_overflow() {
   printf("Testando overflow de INT_MIN em INT_MAX. Arquivo: overflow_2.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -320,7 +320,7 @@ static void roda_teste_atribuicao_de_constante() {
   printf("Testando atribuição de constantes. Arquivo: atribuicao_de_constante.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -345,7 +345,7 @@ static void roda_teste_atribuicao_de_parametro() {
   printf("Testando atribuição de parâmetros. Arquivo: atribuicao_de_parametros.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -367,7 +367,7 @@ static void roda_teste_atribuicao_de_variavel() {
   printf("Testando atribuição de variáveis locais. Arquivo: atribuicao_de_variaveis.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -390,7 +390,7 @@ static void roda_teste_todos_casos_operacao_aritmetica() {
   printf("Testando todos os casos de operações aritméticas. Arquivo: todos_casos_op_aritmetica.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -416,7 +416,7 @@ static void roda_teste_operacao_aritmetica() {
   printf("Testando operações aritméticas. Arquivo: operacao_aritmetica.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -443,7 +443,7 @@ static void roda_teste_soma_um_ao_argumento() {
   printf("Testando somar 1 ao primeiro argumento e retorná-lo. Arquivo: fx_x+1.sbas\n");
 
   // Gera a função
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   // O ponteiro para esta não deve ser NULL
   assert(funcaoSBas != NULL);
@@ -482,7 +482,7 @@ static void roda_teste_diferenca_de_quadrados() {
   }
   printf("Testando diferença de quadrados. Arquivo: diferenca_de_quadrados.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   assert(funcaoSBas != NULL);
 
@@ -512,7 +512,7 @@ static void roda_teste_eh_negativo() {
 
   printf("Testando se número somado a um é negativo. Arquivo: eh_negativo.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   assert(funcaoSBas != NULL);
 
@@ -546,7 +546,7 @@ static void roda_teste_fatorial() {
 
   printf("Testando fatorial. Arquivo: fatorial.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   assert(funcaoSBas != NULL);
 
@@ -586,7 +586,7 @@ static void roda_teste_dead_code() {
 
   printf("Testando dead code. Arquivo: dead_code.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   assert(funcaoSBas != NULL);
 
@@ -612,7 +612,7 @@ static void roda_teste_multiplos_branches() {
 
   printf("Testando múltiplos branches de execução (ifs) . Arquivo: multiplos_branches.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
 
   assert(funcaoSBas != NULL);
 
@@ -651,7 +651,7 @@ static void roda_teste_multiplos_ifs_encadeados() {
 
   printf("Testando múltiplos ifs encadeados. Arquivo: multiplos_ifs_encadeados.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   resultado = funcaoSBas(-2);
@@ -682,7 +682,7 @@ static void roda_teste_dois_argumentos() {
 
   printf("Testando dois argumentos com desvios condicionais. Arquivo: dois_argumentos.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   resultado = funcaoSBas(-4, 5);
@@ -712,7 +712,7 @@ static void roda_teste_tres_argumentos() {
 
   printf("Testando três argumentos com desvios condicionais. Arquivo: tres_argumentos.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   resultado = funcaoSBas(1, 0, -2000);
@@ -739,7 +739,7 @@ static void roda_teste_multiplica_param_por_dez() {
 
   printf("Testando multiplicar argumento por 10. Arquivo: multiplica_param_por_10.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   resultado = funcaoSBas(0);
@@ -769,7 +769,7 @@ static void roda_teste_multiplica() {
 
   printf("Testando multiplicação. Arquivo: multiplicacao.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   resultado = funcaoSBas(1, 1, 1);
@@ -805,7 +805,7 @@ static void roda_teste_subtracao_1()  {
 
   printf("Testando subtração 1. Arquivo: subtracao_1.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   resultado = funcaoSBas(1);
@@ -829,7 +829,7 @@ static void roda_teste_subtracao_2()  {
 
   printf("Testando subtração 2. Arquivo: subtracao_2.sbas\n");
 
-  funcaoSBas = peqcomp(arquivoSbas, codigo);
+  funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
 
   resultado = funcaoSBas(99, 67);

@@ -60,7 +60,7 @@ static void escreve_cmpl_de_desvio(unsigned char codigo[], int* pos, int varInde
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 
-funcp peqcomp(FILE* f, unsigned char codigo[]) {
+funcp sbasCompile(FILE* f, unsigned char codigo[]) {
   unsigned line = 1;
   char lineBuffer[256];
   int pos = 0;         // posição no buffer código
@@ -189,7 +189,7 @@ funcp peqcomp(FILE* f, unsigned char codigo[]) {
   free(rt);
 
   #ifdef DEBUG
-  printf("peqcomp escreveu %d bytes no buffer.\n", pos);
+  printf("sbasCompile escreveu %d bytes no buffer.\n", pos);
   #endif
 
   return (funcp)codigo;
