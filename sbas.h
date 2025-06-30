@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 /**
  * An SBas function:
  * Pointer to a function that takes `n` parameters (up to 3)
