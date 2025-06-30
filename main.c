@@ -1,13 +1,13 @@
 #include <stdio.h>
 
-#include "peqcomp.h"
+#include "sbas.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         fprintf(stderr, "usage: ./sbas <file.sbas>\n");
         return -1;
     }
-    
+
     const char* filename = argv[1];
     FILE* fp = fopen(filename, "r");
     if (!fp) {

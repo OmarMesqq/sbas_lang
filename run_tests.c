@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <limits.h>
 
-#include "peqcomp.h"
+#include "sbas.h"
 
 #define VERDE "\033[0;32m"
 #define RESETAR_COR "\033[0m"

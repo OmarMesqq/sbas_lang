@@ -1,4 +1,4 @@
-#include "peqcomp.h"
+#include "sbas.h"
 
 #include <stdio.h>
 #include <stdlib.h>
