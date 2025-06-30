@@ -1,0 +1,7 @@
+v1: p1
+iflez v1 6
+v2 = v1 + $-1
+iflez v2 7
+ret $1
+ret $2
+ret $3
