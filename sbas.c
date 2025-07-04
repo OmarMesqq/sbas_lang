@@ -15,7 +15,7 @@
  * - line: número da linha onde o símbolo foi declarado.
  * - offset: deslocamento em bytes no stack frame onde a variável está armazenada.
  */
-typedef struct tabelaDeSimbolos {
+typedef struct {
   unsigned char line;
   int offset;
 } SymbolTable;
@@ -27,7 +27,7 @@ typedef struct tabelaDeSimbolos {
  * - lineToBeResolved: linha do código SBas que contém o desvio.
  * - offset: posição no código de máquina onde o endereço de destino deve ser preenchido.
  */
-typedef struct dicionarioDeRelocacao {
+typedef struct {
   unsigned char lineToBeResolved;
   int offset;
 } RelocationTable;
@@ -189,14 +189,14 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
   free(rt);
 
   #ifdef DEBUG
-  printf("sbasCompile escreveu %d bytes no buffer.\n", pos);
+  printf("sbasCompile wrote %d bytes in buffer.\n", pos);
   #endif
 
   return (funcp)codigo;
 }
 
 static void error(const char* msg, int line) { 
-  fprintf(stderr, "%s[linha %d no arquivo .sbas]: %s%s\n", VERMELHO, line, msg, RESETAR_COR);
+  fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", VERMELHO, line, msg, RESETAR_COR);
 }
 
 /**
