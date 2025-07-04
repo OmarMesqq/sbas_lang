@@ -5,8 +5,8 @@
 
 #include "sbas.h"
 
-#define VERDE "\033[0;32m"
-#define RESETAR_COR "\033[0m"
+#define GREEN "\033[0;32m"
+#define RESET_COLOR "\033[0m"
 
 static void roda_teste_parseia_toda_a_gramatica();
 static void roda_teste_retorno_zero();
@@ -68,12 +68,12 @@ static void roda_teste_parseia_toda_a_gramatica() {
   unsigned char codigo[500];
   funcp funcaoSBas;
 
-  arquivoSbas = fopen("test_files/full_test_suite.sbas", "r");
+  arquivoSbas = fopen("test_files/everything.sbas", "r");
   if (!arquivoSbas) {
     printf("Falha ao abrir arquivo SBas para leitura!\n");
     return;
   }
-  printf("Testando se toda a gramática é parseada corretamente. Arquivo: tudo.sbas\n");
+  printf("Testing if grammar is correctly parsed.\n");
 
   // Gera a função
   funcaoSBas = sbasCompile(arquivoSbas, codigo);
@@ -82,7 +82,7 @@ static void roda_teste_parseia_toda_a_gramatica() {
   assert(funcaoSBas != NULL);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de parse da gramática passou!\n" RESETAR_COR);
+  printf(GREEN "Full grammar parse test passed!\n" RESET_COLOR);
 }
 
 static void roda_teste_salva_callee_saveds() {
@@ -95,7 +95,7 @@ static void roda_teste_salva_callee_saveds() {
     printf("Falha ao abrir arquivo SBas para leitura!\n");
     return;
   }
-  printf("Testando se callee-saveds são preservados...\n");
+  printf("Testing if callee-saved registers are preserved...\n");
 
   funcaoSBas = sbasCompile(arquivoSbas, codigo);
   assert(funcaoSBas != NULL);
@@ -130,14 +130,14 @@ static void roda_teste_salva_callee_saveds() {
       "mov %%r15, %[out_r15]\n\t"
       : [out_b] "=r"(rbx_depois), [out_r12] "=r"(r12_depois), [out_r13] "=r"(r13_depois), [out_r14] "=r"(r14_depois), [out_r15] "=r"(r15_depois));
 
-  assert(rbx_depois == rbx && "RBX foi alterado e não restaurado pelo código gerado!");
-  assert(r12_depois == r12 && "R12 foi alterado e não restaurado pelo código gerado!");
-  assert(r13_depois == r13 && "R13 foi alterado e não restaurado pelo código gerado!");
-  assert(r14_depois == r14 && "R14 foi alterado e não restaurado pelo código gerado!");
-  assert(r15_depois == r15 && "R15 foi alterado e não restaurado pelo código gerado!");
+  assert(rbx_depois == rbx && "rbx was altered and not restored!");
+  assert(r12_depois == r12 && "r12 was altered and not restored!");
+  assert(r13_depois == r13 && "r13 was altered and not restored!");
+  assert(r14_depois == r14 && "r14 was altered and not restored!");
+  assert(r15_depois == r15 && "r15 was altered and not restored!");
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de callee-saveds passou!\n" RESETAR_COR);
+  printf(GREEN "Callee-saved registers test passed!\n" RESET_COLOR);
 }
 
 static void roda_teste_retorno_zero() {
@@ -165,7 +165,7 @@ static void roda_teste_retorno_zero() {
   assert(resultado == 0);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de retorno zero passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de retorno zero passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_retorno_constante() {
@@ -193,7 +193,7 @@ static void roda_teste_retorno_constante() {
   assert(resultado == 16909060);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de retorno de uma constante passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de retorno de uma constante passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_retorno_de_um_param() {
@@ -221,7 +221,7 @@ static void roda_teste_retorno_de_um_param() {
   assert(resultado == -1253512);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de retorno de um param passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de retorno de um param passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_retorno_variavel() {
@@ -249,7 +249,7 @@ static void roda_teste_retorno_variavel() {
   assert(resultado == 5);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de retorno de variável local passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de retorno de variável local passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_overflow() {
@@ -298,7 +298,7 @@ static void roda_teste_overflow() {
   assert(resultado == 2147483647);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de overflow passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de overflow passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_atribuicao_de_constante() {
@@ -323,7 +323,7 @@ static void roda_teste_atribuicao_de_constante() {
   assert(resultado == -1004);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de atribuição de constantes passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de atribuição de constantes passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_atribuicao_de_parametro() {
@@ -344,7 +344,7 @@ static void roda_teste_atribuicao_de_parametro() {
   assert(funcaoSBas != NULL);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de atribuição de parâmetros passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de atribuição de parâmetros passou!\n" RESET_COLOR);
 }
 
 
@@ -370,7 +370,7 @@ static void roda_teste_todos_casos_operacao_aritmetica() {
   assert(resultado == -746);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de todos os casos de operações aritméticas passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de todos os casos de operações aritméticas passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_operacao_aritmetica() {
@@ -396,7 +396,7 @@ static void roda_teste_operacao_aritmetica() {
   assert(resultado == 2520);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de operações aritméticas passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de operações aritméticas passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_soma_um_ao_argumento() {
@@ -436,7 +436,7 @@ static void roda_teste_soma_um_ao_argumento() {
   assert(resultado == INT_MIN);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de somar 1 ao primeiro argumento passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de somar 1 ao primeiro argumento passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_diferenca_de_quadrados() {
@@ -463,7 +463,7 @@ static void roda_teste_diferenca_de_quadrados() {
   assert(funcaoSBas(-5, -4) == 9);  // 25 - 16 = 9
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de diferença de quadrados passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de diferença de quadrados passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_eh_negativo() {
@@ -495,7 +495,7 @@ static void roda_teste_eh_negativo() {
   assert(resultado == 0);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de se número somado a um é negativo passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de se número somado a um é negativo passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_fatorial() {
@@ -533,7 +533,7 @@ static void roda_teste_fatorial() {
 
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de fatorial passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de fatorial passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_dead_code() {
@@ -559,7 +559,7 @@ static void roda_teste_dead_code() {
   assert(resultado != 6);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de dead code passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de dead code passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_multiplos_branches() {
@@ -596,7 +596,7 @@ static void roda_teste_multiplos_branches() {
 
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de múltiplos branches de execução (ifs) passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de múltiplos branches de execução (ifs) passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_multiplos_ifs_encadeados() {
@@ -625,7 +625,7 @@ static void roda_teste_multiplos_ifs_encadeados() {
   assert(resultado == 42);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de múltiplos ifs encadeados passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de múltiplos ifs encadeados passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_dois_argumentos() {
@@ -653,7 +653,7 @@ static void roda_teste_dois_argumentos() {
   assert(resultado == -875);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de dois argumentos com iflez passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de dois argumentos com iflez passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_tres_argumentos() {
@@ -678,7 +678,7 @@ static void roda_teste_tres_argumentos() {
   assert(resultado == -444);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de três argumentos com iflez passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de três argumentos com iflez passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_multiplica_param_por_dez() {
@@ -706,7 +706,7 @@ static void roda_teste_multiplica_param_por_dez() {
   assert(resultado == -10);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de multiplicar argumento por 10 passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de multiplicar argumento por 10 passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_multiplica() {
@@ -740,7 +740,7 @@ static void roda_teste_multiplica() {
   assert(resultado == -2500);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de multiplicação passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de multiplicação passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_subtracao_1()  {
@@ -762,7 +762,7 @@ static void roda_teste_subtracao_1()  {
   assert(resultado == 0);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de subtração 1 passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de subtração 1 passou!\n" RESET_COLOR);
 }
 
 static void roda_teste_subtracao_2()  {
@@ -784,7 +784,7 @@ static void roda_teste_subtracao_2()  {
   assert(resultado == 0);
 
   fclose(arquivoSbas);
-  printf(VERDE "Teste de subtração 2 passou!\n" RESETAR_COR);
+  printf(GREEN "Teste de subtração 2 passou!\n" RESET_COLOR);
 }
 
 static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected) {
@@ -828,5 +828,5 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
   assert(res == expected);
 
   fclose(sbasFile);
-  printf("%sTest %s passed for file %s!%s\n", VERDE, testName, filePath, RESETAR_COR);
+  printf("%sTest %s passed for file %s!%s\n", GREEN, testName, filePath, RESET_COLOR);
 }
