@@ -66,7 +66,7 @@ static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 static void* alloc_wx_buffer(size_t size);
 static void print_symbol_table(SymbolTable* st, int lines);
-static void print_relocation_table(RelocationTable* rt, int lines);
+static void print_relocation_table(RelocationTable* rt, int relocCount);
 
 funcp sbasCompile(FILE* f) {
   unsigned line = 1;  // in .sbas file
@@ -84,7 +84,7 @@ funcp sbasCompile(FILE* f) {
   unsigned char* code = alloc_wx_buffer(MAX_CODE_SIZE);
   if (!code) {
     fprintf(stderr, "Failed to alloc W+X memory.\n");
-    exit(1);
+    return NULL;
   }
 
 
@@ -206,8 +206,10 @@ funcp sbasCompile(FILE* f) {
 
   #ifdef DEBUG
   printf("sbasCompile wrote %d bytes in buffer.\n", pos);
+  printf("Parsed %d lines.\n", line);
+  printf("%d lines were patched.\n", relocCount);
   print_symbol_table(st, line);
-  print_relocation_table(rt, line);
+  print_relocation_table(rt, relocCount);
   #endif
 
   free(st);
@@ -825,17 +827,17 @@ static void* alloc_wx_buffer(size_t size) {
 static void print_symbol_table(SymbolTable* st, int lines) {
   printf("----- START SYMBOL TABLE -----\n");
   printf("%-14s %s\n", "LINE", "OFFSET (dec)");
-  for (int i = 1; i < lines + 1; i++) {
+  for (int i = 1; i < lines; i++) {
     printf("%-14d %d\n", st[i].line, st[i].offset);
   }
   printf("----- END SYMBOL TABLE -----\n");
 }
 
 
-static void print_relocation_table(RelocationTable* rt, int lines) {
+static void print_relocation_table(RelocationTable* rt, int relocCount) {
   printf("----- START RELOCATION TABLE -----\n");
   printf("%-20s %s\n", "LINE TO PATCH", "OFFSET (dec)");
-  for (int i = 1; i < lines + 1; i++) {
+  for (int i = 0; i < relocCount; i++) {
     printf("%-20d %d\n", rt[i].lineToBeResolved, rt[i].offset);
   }
   printf("----- END RELOCATION TABLE -----\n");
