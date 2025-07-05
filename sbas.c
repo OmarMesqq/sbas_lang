@@ -8,9 +8,9 @@
 #include <errno.h>
 
 // #define DEBUG
-#define VERMELHO "\033[31m"
-#define RESETAR_COR "\033[0m"
-#define MAX_LINHAS 30
+#define RED "\033[31m"
+#define RESET_COLOR "\033[0m"
+#define MAX_LINES 30
 #define MAX_CODE_SIZE 1024
 
 /**
@@ -51,62 +51,65 @@ typedef struct {
 
 
 static void error(const char* msg, int line);
-static void escreve_prologo(unsigned char codigo[], int* pos);
-static void inicializa_registradores(unsigned char codigo[], int* pos);
-static void salva_regs_callee_saved(unsigned char codigo[], int* pos);
-static void restaura_regs_callee_saved(unsigned char codigo[], int* pos);
-static void escreve_epilogo(unsigned char codigo[], int* pos);
-static void escreve_inteiro_em_4bytes_hex(unsigned char codigo[], int* pos, int inteiro);
-static void escreve_retorno_constante(unsigned char codigo[], int* pos, int valorRetorno);
-static void escreve_retorno_variavel(unsigned char codigo[], int* pos, int varIdx);
-static void escreve_atribuicao(unsigned char codigo[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
-static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
-static void escreve_cmpl_de_desvio(unsigned char codigo[], int* pos, int varIndex);
+static void emit_prologue(unsigned char code[], int* pos);
+static void zero_initialize_registers(unsigned char code[], int* pos);
+static void save_callee_saved_registers(unsigned char code[], int* pos);
+static void restore_callee_saved_registers(unsigned char code[], int* pos);
+static void emit_epilogue(unsigned char code[], int* pos);
+static void emit_integer_in_hex(unsigned char code[], int* pos, int inteiro);
+static void emit_constant_literal_return(unsigned char code[], int* pos, int valorRetorno);
+static void emit_variable_return(unsigned char code[], int* pos, int varIdx);
+static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
+static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
+static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 static void* alloc_wx_buffer(size_t size);
 
 funcp sbasCompile(FILE* f) {
-  unsigned line = 1;
-  char lineBuffer[256];
-  int pos = 0;         // posição no buffer código
-  int relocCount = 0;  // quantas linhas devem ter o offset resolvido para o jump
+  unsigned line = 1;  // in .sbas file
+  char lineBuffer[256]; // for parsing the text lines
+  int pos = 0;         // byte position in the buffer
+  int relocCount = 0;  // how many lines should have jump offsets patched in the 2nd pass
 
-  SymbolTable* st = malloc((MAX_LINHAS + 1) * sizeof(SymbolTable));
-  RelocationTable* rt = malloc((MAX_LINHAS + 1) * sizeof(RelocationTable));
+  SymbolTable* st = malloc((MAX_LINES + 1) * sizeof(SymbolTable));
+  RelocationTable* rt = malloc((MAX_LINES + 1) * sizeof(RelocationTable));
   if (!st || !rt) {
     fprintf(stderr, "Failed to alloc symbol and/or relocation table!\n");
     return NULL;
   }
+
   unsigned char* code = alloc_wx_buffer(MAX_CODE_SIZE);
   if (!code) {
-      fprintf(stderr, "Failed to alloc W+X memory.\n");
-      exit(1);
+    fprintf(stderr, "Failed to alloc W+X memory.\n");
+    exit(1);
   }
 
 
-  escreve_prologo(code, &pos);
-  salva_regs_callee_saved(code, &pos);
-  inicializa_registradores(code, &pos);
+  emit_prologue(code, &pos);
+  save_callee_saved_registers(code, &pos);
+  zero_initialize_registers(code, &pos);
 
   /**
-   * Primeiro passe no código fonte: emite maior parte das instruções
-   * e deixa "buracos" de 4 bytes de zero para jumps
+   * First pass: emit most instructions and leave 4-byte "holes"
+   * for jumps
    */
-  while (fgets(lineBuffer, sizeof(lineBuffer), f) && line <= MAX_LINHAS) {
+  while (fgets(lineBuffer, sizeof(lineBuffer), f) && line <= MAX_LINES) {
+    
     st[line].line = line;
     st[line].offset = pos;
+
     switch (lineBuffer[0]) {
-      case 'r': { /* retorno */
+      case 'r': { /* return */
         int varc;
 
         // retorno de uma variável local (ex.: ret v2)
         if (sscanf(lineBuffer, "ret v%d", &varc) == 1) {
-          escreve_retorno_variavel(code, &pos, varc);
+          emit_variable_return(code, &pos, varc);
         }
         // retorno de uma constante (ex.: ret $-10)
         else if (sscanf(lineBuffer, "ret $%d", &varc) == 1) {
-          escreve_retorno_constante(code, &pos, varc);
+          emit_constant_literal_return(code, &pos, varc);
         }
         // erro de sintaxe
         else {
@@ -116,7 +119,7 @@ funcp sbasCompile(FILE* f) {
 
         break;
       }
-      case 'v': { /* atribuicao e operacao aritmetica */
+      case 'v': { /* attribution and arithmetic operation */
         int idxVar;
         char operator;
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
@@ -135,7 +138,7 @@ funcp sbasCompile(FILE* f) {
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
             error("comando inválido: esperada atribuição (vX: <vX|pX|$num>)", line);
           }
-          escreve_atribuicao(code, &pos, idxVar, varpcPrefix, idxVarpc);
+          emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
         }
         // operação aritmética
         else if (operator == '=') {
@@ -154,12 +157,12 @@ funcp sbasCompile(FILE* f) {
             error("comando inválido: só são permitidas adição, subtração e multiplicação em SBas", line);
           }
 
-          escreve_operacao_aritmetica(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
+          emit_arithmetic_operation(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
         }
 
         break;
       }
-      case 'i': { /* desvio condicional */
+      case 'i': { /* conditional jump */
         int varIndex;
         unsigned lineTarget;
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
@@ -167,7 +170,7 @@ funcp sbasCompile(FILE* f) {
           return NULL;
         }
 
-        escreve_cmpl_de_desvio(code, &pos, varIndex);
+        emit_cmp_jump_instruction(code, &pos, varIndex);
 
         // Reserva espaço para salto condicional na tabela de relocação
         rt[relocCount].lineToBeResolved = lineTarget;
@@ -177,7 +180,7 @@ funcp sbasCompile(FILE* f) {
 
         break;
       }
-      case '/': {
+      case '/': { /* comment */
         continue;
       }
       default:
@@ -188,16 +191,15 @@ funcp sbasCompile(FILE* f) {
   }
 
   /**
-   * Segundo passe no código fonte: preenche placeholders de saltos condicionais
-   * com os devidos offsets
+   * Second pass: fills 4-byte placeholder with offsets
    */
   for (int i = 0; i < relocCount; i++) {
     int targetOffset = st[rt[i].lineToBeResolved].offset;
     int jumpFrom = rt[i].offset;
 
-    // offset relativo à próxima instrução
+    // offset relative to the next instruction
     int rel32 = targetOffset - (jumpFrom + 4);
-    escreve_inteiro_em_4bytes_hex(code, &jumpFrom, rel32);
+    emit_integer_in_hex(code, &jumpFrom, rel32);
   }
   
   free(st);
@@ -218,242 +220,244 @@ void sbasCleanup(funcp sbasFunc) {
 }
 
 static void error(const char* msg, int line) { 
-  fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", VERMELHO, line, msg, RESETAR_COR);
+  fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg, RESET_COLOR);
 }
 
 /**
- * Configura início de uma função x86-64. Salva base do RA
- * anterior e configura a base do RA atual
+ * Starts an x86-64 function. Saves previous frame base pointer
+ * and configure current stack frame.
  */
-static void escreve_prologo(unsigned char codigo[], int* pos) {
-  // pushq %rbp é a primeira instrução de qualquer função
-  codigo[*pos] = 0x55;
+static void emit_prologue(unsigned char code[], int* pos) {
+  // pushq %rbp
+  code[*pos] = 0x55;
   (*pos)++;
-  // seguida de movq %rsp, %rbp
-  codigo[*pos] = 0x48;
+
+  // movq %rsp, %rbp
+  code[*pos] = 0x48;
   (*pos)++;
-  codigo[*pos] = 0x89;
+  code[*pos] = 0x89;
   (*pos)++;
-  codigo[*pos] = 0xe5;
+  code[*pos] = 0xe5;
   (*pos)++;
 }
 
 /**
- * Apesar do projeto não especificar nada sobre variáveis não inicializadas,
- * optei por zerar todos os registradores associados antes de começar a
- * escrever as operações
+ * Even though uninitialized variables are not accepted per
+ * SBas specification, I zero initialized all local variable registers.
  */
-static void inicializa_registradores(unsigned char codigo[], int* pos) {
+static void zero_initialize_registers(unsigned char code[], int* pos) {
   // xorl %ebx,%ebx
-  codigo[*pos] = 0x31;
+  code[*pos] = 0x31;
   (*pos)++;
-  codigo[*pos] = 0xdb;
+  code[*pos] = 0xdb;
   (*pos)++;
 
   // xorl  %r12d,%r12d
-  codigo[*pos] = 0x45;
+  code[*pos] = 0x45;
   (*pos)++;
-  codigo[*pos] = 0x31;
+  code[*pos] = 0x31;
   (*pos)++;
-  codigo[*pos] = 0xe4;
+  code[*pos] = 0xe4;
   (*pos)++;
 
 
   // xorl  %r13d, %r13d
-  codigo[*pos] = 0x45;
+  code[*pos] = 0x45;
   (*pos)++;
-  codigo[*pos] = 0x31;
+  code[*pos] = 0x31;
   (*pos)++;
-  codigo[*pos] = 0xed;
+  code[*pos] = 0xed;
   (*pos)++;
 
   // xorl  %r14d, %r14d
-  codigo[*pos] = 0x45;
+  code[*pos] = 0x45;
   (*pos)++;
-  codigo[*pos] = 0x31;
+  code[*pos] = 0x31;
   (*pos)++;
-  codigo[*pos] = 0xf6;
+  code[*pos] = 0xf6;
   (*pos)++;
 
   // xorl  %r15d, %r15d
-  codigo[*pos] = 0x45;
+  code[*pos] = 0x45;
   (*pos)++;
-  codigo[*pos] = 0x31;
+  code[*pos] = 0x31;
   (*pos)++;
-  codigo[*pos] = 0xff;
+  code[*pos] = 0xff;
   (*pos)++;
 
 }
 
 /**
- * Usei os registradores %ebx para v1 e %r12d a %r15d para v2 - v5.
- * Como são callee-saveds, devemos salvá-los
+ * I mapped the SBas local variables to callee-saved registers. As such,
+ * they have to be saved in the stack frame for later restoration.
+ * v1 - ebx
+ * v2 - r12d
+ * v3 - r13d
+ * v4 - r14d
+ * v5 - r15d
  */
-static void salva_regs_callee_saved(unsigned char codigo[], int* pos) {
+static void save_callee_saved_registers(unsigned char code[], int* pos) {
   // subq $48, %rsp
-  codigo[*pos] = 0x48;
+  code[*pos] = 0x48;
   (*pos)++;
-  codigo[*pos] = 0x83;
+  code[*pos] = 0x83;
   (*pos)++;
-  codigo[*pos] = 0xEC;
+  code[*pos] = 0xEC;
   (*pos)++;
-  codigo[*pos] = 0x30;
+  code[*pos] = 0x30;
   (*pos)++;
 
   // movq %rbx, -8(%rbp)
-  codigo[*pos] = 0x48;
+  code[*pos] = 0x48;
   (*pos)++;
-  codigo[*pos] = 0x89;
+  code[*pos] = 0x89;
   (*pos)++;
-  codigo[*pos] = 0x5D;
+  code[*pos] = 0x5D;
   (*pos)++;
-  codigo[*pos] = 0xF8;
+  code[*pos] = 0xF8;
   (*pos)++;
 
   // movq %r12, -16(%rbp)
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x89;
+  code[*pos] = 0x89;
   (*pos)++;
-  codigo[*pos] = 0x65;
+  code[*pos] = 0x65;
   (*pos)++;
-  codigo[*pos] = 0xF0;
+  code[*pos] = 0xF0;
   (*pos)++;
 
   // movq %r13, -24(%rbp)
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x89;
+  code[*pos] = 0x89;
   (*pos)++;
-  codigo[*pos] = 0x6D;
+  code[*pos] = 0x6D;
   (*pos)++;
-  codigo[*pos] = 0xE8;
+  code[*pos] = 0xE8;
   (*pos)++;
 
   // movq %r14, -32(%rbp)
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x89;
+  code[*pos] = 0x89;
   (*pos)++;
-  codigo[*pos] = 0x75;
+  code[*pos] = 0x75;
   (*pos)++;
-  codigo[*pos] = 0xE0;
+  code[*pos] = 0xE0;
   (*pos)++;
 
   // movq %r15, -40(%rbp)
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x89;
+  code[*pos] = 0x89;
   (*pos)++;
-  codigo[*pos] = 0x7D;
+  code[*pos] = 0x7D;
   (*pos)++;
-  codigo[*pos] = 0xD8;
+  code[*pos] = 0xD8;
   (*pos)++;
 }
 
 /**
- * Assim que a função SBas encerrar, deve-se restaurar os
- * callee-saveds
+ * Restore callee-saved registers at the end of an SBas function
  */
-static void restaura_regs_callee_saved(unsigned char codigo[], int* pos) {
+static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   // movq -8(%rbp), %rbx
-  codigo[*pos] = 0x48;
+  code[*pos] = 0x48;
   (*pos)++;
-  codigo[*pos] = 0x8B;
+  code[*pos] = 0x8B;
   (*pos)++;
-  codigo[*pos] = 0x5D;
+  code[*pos] = 0x5D;
   (*pos)++;
-  codigo[*pos] = 0xF8;
+  code[*pos] = 0xF8;
   (*pos)++;
 
   // movq -16(%rbp), %r12
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x8B;
+  code[*pos] = 0x8B;
   (*pos)++;
-  codigo[*pos] = 0x65;
+  code[*pos] = 0x65;
   (*pos)++;
-  codigo[*pos] = 0xF0;
+  code[*pos] = 0xF0;
   (*pos)++;
 
   // movq -24(%rbp), %r13
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x8B;
+  code[*pos] = 0x8B;
   (*pos)++;
-  codigo[*pos] = 0x6D;
+  code[*pos] = 0x6D;
   (*pos)++;
-  codigo[*pos] = 0xE8;
+  code[*pos] = 0xE8;
   (*pos)++;
 
   // movq -32(%rbp), %r14
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x8B;
+  code[*pos] = 0x8B;
   (*pos)++;
-  codigo[*pos] = 0x75;
+  code[*pos] = 0x75;
   (*pos)++;
-  codigo[*pos] = 0xE0;
+  code[*pos] = 0xE0;
   (*pos)++;
 
   // movq -40(%rbp), %r15
-  codigo[*pos] = 0x4C;
+  code[*pos] = 0x4C;
   (*pos)++;
-  codigo[*pos] = 0x8B;
+  code[*pos] = 0x8B;
   (*pos)++;
-  codigo[*pos] = 0x7D;
+  code[*pos] = 0x7D;
   (*pos)++;
-  codigo[*pos] = 0xD8;
-  (*pos)++;
-}
-
-/**
- * Desfaz RA atual: leave e ret
- */
-static void escreve_epilogo(unsigned char codigo[], int* pos) {
-  // toda função termina com leave e ret
-  codigo[*pos] = 0xc9;
-  (*pos)++;
-
-  codigo[*pos] = 0xc3;
+  code[*pos] = 0xD8;
   (*pos)++;
 }
 
 /**
- * Recebe um inteiro com sinal em base 10 e o escreve em hexadecimal, little
- * endian no buffer. Usado para valores imediatos SBas (como v1: $5) e offsets
- * de saltos
+ * Undoes current stack frame: emits leave and ret
  */
-static void escreve_inteiro_em_4bytes_hex(unsigned char codigo[], int* pos, int inteiro) {
-  codigo[*pos] = inteiro & 0xFF;
+static void emit_epilogue(unsigned char code[], int* pos) {
+  //leave
+  code[*pos] = 0xc9;
   (*pos)++;
-  codigo[*pos] = (inteiro >> 8) & 0xFF;
-  (*pos)++;
-  codigo[*pos] = (inteiro >> 16) & 0xFF;
-  (*pos)++;
-  codigo[*pos] = (inteiro >> 24) & 0xFF;
+
+  // ret
+  code[*pos] = 0xc3;
   (*pos)++;
 }
 
 /**
- * Escreve código máquina para retornar um valor imediato imm32 (colocá-lo no %eax)
- * Prossegue com a restauração de callee-saves e epílogo da função também
+ * Receives a signed integer (32 bits on x86-64) in base 10 and writes it
+ * in Little Endian in the buffer. Used for immediate values and jump offsets.
  */
-static void escreve_retorno_constante(unsigned char codigo[], int* pos, int valorRetorno) {
-  codigo[*pos] = 0xb8;  // movl ..., %eax
+static void emit_integer_in_hex(unsigned char code[], int* pos, int inteiro) {
+  code[*pos] = inteiro & 0xFF;
   (*pos)++;
-
-  escreve_inteiro_em_4bytes_hex(codigo, pos, valorRetorno);
-
-  restaura_regs_callee_saved(codigo, pos);
-  escreve_epilogo(codigo, pos);
+  code[*pos] = (inteiro >> 8) & 0xFF;
+  (*pos)++;
+  code[*pos] = (inteiro >> 16) & 0xFF;
+  (*pos)++;
+  code[*pos] = (inteiro >> 24) & 0xFF;
+  (*pos)++;
 }
 
 /**
- * Escreve código máquina para retornar uma variável SBas (v1 a v5)
- * Prossegue com a restauração de callee-saves e epílogo da função também
+ * Emits machine code for returning an immediate value (movl $imm32, %eax)
  */
-static void escreve_retorno_variavel(unsigned char codigo[], int* pos, int varIdx) {
+static void emit_constant_literal_return(unsigned char code[], int* pos, int valorRetorno) {
+  code[*pos] = 0xb8;  // movl ..., %eax
+  (*pos)++;
+
+  emit_integer_in_hex(code, pos, valorRetorno);
+
+  restore_callee_saved_registers(code, pos);
+  emit_epilogue(code, pos);
+}
+
+/**
+ * Emits machine code for returning an SBas variable (v1 through v5)
+ */
+static void emit_variable_return(unsigned char code[], int* pos, int varIdx) {
   RegInfo reg = get_local_var_reg(varIdx);
   if (reg.reg_code == -1) {
     return;
@@ -461,11 +465,11 @@ static void escreve_retorno_variavel(unsigned char codigo[], int* pos, int varId
 
   // Escreve byte REX se necessário
   if (reg.rex) {
-    codigo[(*pos)++] = 0x44;  // REX com bit R setado em 1 (para reg de origem)
+    code[(*pos)++] = 0x44;  // REX com bit R setado em 1 (para reg de origem)
   }
 
   // Escreve byte da operação `mov`
-  codigo[(*pos)++] = 0x89;
+  code[(*pos)++] = 0x89;
 
   /**
    * Constrói o byte ModRM:
@@ -477,17 +481,17 @@ static void escreve_retorno_variavel(unsigned char codigo[], int* pos, int varId
    * Os três bits r/m indicam o registrador de destino (no caso de retorno, %eax = 000)
    */
   unsigned char modrm = 0xC0 + (reg.reg_code << 3);
-  codigo[(*pos)++] = modrm;
+  code[(*pos)++] = modrm;
 
-  restaura_regs_callee_saved(codigo, pos);
-  escreve_epilogo(codigo, pos);
+  restore_callee_saved_registers(code, pos);
+  emit_epilogue(code, pos);
 }
 
 /**
  * Escreve código de máquina de uma atribuição SBas
  * vX: <vX|pX|$num>
  */
-static void escreve_atribuicao(unsigned char codigo[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
+static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
   // atribuição variável-variável
   if (varpcPrefix == 'v') {
     RegInfo src = get_local_var_reg(idxVarpc);
@@ -499,12 +503,12 @@ static void escreve_atribuicao(unsigned char codigo[], int* pos, int idxVar, cha
       unsigned char rex = 0x40;
       if (src.rex) rex |= 0x04; // seta o bit R para reg de origem
       if (dst.rex) rex |= 0x01; // seta o bit B para reg de destino
-      codigo[(*pos)++] = rex;
+      code[(*pos)++] = rex;
     }
 
-    codigo[(*pos)++] = 0x89;  // mov
+    code[(*pos)++] = 0x89;  // mov
     // cálculo do byte ModRM
-    codigo[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
+    code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
   }
   // atribuição variável-parâmetro 
   else if (varpcPrefix == 'p') {
@@ -515,12 +519,12 @@ static void escreve_atribuicao(unsigned char codigo[], int* pos, int idxVar, cha
 
     // Emite byte REX se necessário
     if (dst.rex) {
-      codigo[(*pos)++] = 0x41;
+      code[(*pos)++] = 0x41;
     }
 
-    codigo[(*pos)++] = 0x89;  // mov
+    code[(*pos)++] = 0x89;  // mov
     // cálculo do byte ModRM
-    codigo[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
+    code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
 
   } 
   // atribuição variável-imediato 
@@ -530,23 +534,23 @@ static void escreve_atribuicao(unsigned char codigo[], int* pos, int idxVar, cha
 
     // Emite byte REX se necessário
     if (dst.rex) {
-      codigo[(*pos)++] = 0x41;
+      code[(*pos)++] = 0x41;
     }
 
     /**
      * Valor imediato para registrador: não usa byte ModRM
      * A regra é: 0xB8 + (número do registrador), seguido de 4 bytes do inteiro
      */
-    codigo[(*pos)++] = 0xB8 + dst.reg_code;
-    escreve_inteiro_em_4bytes_hex(codigo, pos, idxVarpc);
+    code[(*pos)++] = 0xB8 + dst.reg_code;
+    emit_integer_in_hex(code, pos, idxVarpc);
   }
 }
 
 /**
- * Escreve código de máquina de uma operação aritmética em SBas
+ * Emit machine code for a SBas arithmetic operation:
  * vX = <vX | $num> op <vX | $num>
  */
-static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2) {
+static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2) {
   /**
    * For commutative operations, we swap the operands so we keep a single logic path
    */
@@ -576,14 +580,14 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
       unsigned char rex = 0x40;
       if (src.rex) rex |= 0x04;
       if (dst.rex) rex |= 0x01;
-      codigo[(*pos)++] = rex;
+      code[(*pos)++] = rex;
     }
 
     // Escreve byte `mov`
-    codigo[(*pos)++] = 0x89;
+    code[(*pos)++] = 0x89;
 
     // Escreve ModRM
-    codigo[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
+    code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
 
   } else if (varc1Prefix == '$') {
     // valor imediato para registrador: não usa byte ModRM
@@ -593,12 +597,12 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
 
     // Escreve byte REX se necessário (B = 1 para registrador estendido)
     if (dst.rex) {
-      codigo[(*pos)++] = 0x41;
+      code[(*pos)++] = 0x41;
     }
 
     // Escreve a instrução mov em si para caso de constante -> registrador
-    codigo[(*pos)++] = 0xB8 + dst.reg_code;
-    escreve_inteiro_em_4bytes_hex(codigo, pos, idxVarc1);
+    code[(*pos)++] = 0xB8 + dst.reg_code;
+    emit_integer_in_hex(code, pos, idxVarc1);
 
   } else {
     fprintf(stderr, "Operação aritmética inválida!\n");
@@ -626,13 +630,13 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
       unsigned char rex = 0x40;
       if (src.rex) rex |= 0x04;
       if (dst.rex) rex |= 0x01;
-      codigo[(*pos)++] = rex;
+      code[(*pos)++] = rex;
     }
 
     switch (op) {
-      case '+': codigo[(*pos)++] = 0x01; break;
-      case '-': codigo[(*pos)++] = 0x29; break;
-      case '*': codigo[(*pos)++] = 0x0F; codigo[(*pos)++] = 0xAF; break;
+      case '+': code[(*pos)++] = 0x01; break;
+      case '-': code[(*pos)++] = 0x29; break;
+      case '*': code[(*pos)++] = 0x0F; code[(*pos)++] = 0xAF; break;
       default:
         fprintf(stderr, "Operação aritmética inválida!\n");
         return;
@@ -640,9 +644,9 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
 
     // Exceção para multiplicação: inverte ordem reg/rm
     if (op == '*') {
-      codigo[(*pos)++] = 0xC0 + (dst.reg_code << 3) + src.reg_code;
+      code[(*pos)++] = 0xC0 + (dst.reg_code << 3) + src.reg_code;
     } else {
-      codigo[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
+      code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
     }
 
   } else if (varc2Prefix == '$') {
@@ -653,7 +657,7 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
     if (dst.rex) {
       unsigned char rex = 0x40;
       rex |= 0x05;  // seta bit REX.R e REX.B
-      codigo[(*pos)++] = rex;
+      code[(*pos)++] = rex;
     }    
 
     /**
@@ -665,37 +669,37 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
     switch (op) {
       case '+': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          codigo[(*pos)++] = 0x83;
-          codigo[(*pos)++] = 0xC0 + dst.reg_code;
-          codigo[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
+          code[(*pos)++] = 0x83;
+          code[(*pos)++] = 0xC0 + dst.reg_code;
+          code[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
         } else {
-          codigo[(*pos)++] = 0x81;
-          codigo[(*pos)++] = 0xC0 + dst.reg_code;
-          escreve_inteiro_em_4bytes_hex(codigo, pos, idxVarc2);
+          code[(*pos)++] = 0x81;
+          code[(*pos)++] = 0xC0 + dst.reg_code;
+          emit_integer_in_hex(code, pos, idxVarc2);
         }
         break;
       }
       case '-': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          codigo[(*pos)++] = 0x83;
-          codigo[(*pos)++] = 0xE8 + dst.reg_code;
-          codigo[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
+          code[(*pos)++] = 0x83;
+          code[(*pos)++] = 0xE8 + dst.reg_code;
+          code[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
         } else {
-          codigo[(*pos)++] = 0x81;
-          codigo[(*pos)++] = 0xE8 + dst.reg_code;
-          escreve_inteiro_em_4bytes_hex(codigo, pos, idxVarc2);
+          code[(*pos)++] = 0x81;
+          code[(*pos)++] = 0xE8 + dst.reg_code;
+          emit_integer_in_hex(code, pos, idxVarc2);
         }
         break;
       }
       case '*': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          codigo[(*pos)++] = 0x6B;
-          codigo[(*pos)++] = 0xC0 + dst.reg_code * 9;
-          codigo[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
+          code[(*pos)++] = 0x6B;
+          code[(*pos)++] = 0xC0 + dst.reg_code * 9;
+          code[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
         } else {
-          codigo[(*pos)++] = 0x69;
-          codigo[(*pos)++] = 0xC0 + dst.reg_code * 9;
-          escreve_inteiro_em_4bytes_hex(codigo, pos, idxVarc2);
+          code[(*pos)++] = 0x69;
+          code[(*pos)++] = 0xC0 + dst.reg_code * 9;
+          emit_integer_in_hex(code, pos, idxVarc2);
         }
         break;
       }
@@ -707,28 +711,29 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
 }
 
 /**
- * Escreve a primeira parte (instrução) de um `iflez` SBas (cmpl $0, <registradorDaVariavel>)
+ * Writes the first instruction of a SBas conditional jump (`iflez`):
+ * cmpl $0, <variableRegister>
  */
-static void escreve_cmpl_de_desvio(unsigned char codigo[], int* pos, int varIndex) {
+static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex) {
   RegInfo reg = get_local_var_reg(varIndex);
   if (reg.reg_code == -1) {
-    fprintf(stderr, "escreve_cmpl_de_desvio: índice de variável inválido: v%d\n", varIndex);
+    fprintf(stderr, "emit_cmp_jump_instruction: índice de variável inválido: v%d\n", varIndex);
     return;
   }
 
   // Emite REX
   if (reg.rex) {
-    codigo[(*pos)++] = 0x41;
+    code[(*pos)++] = 0x41;
   }
 
   // Emite `cmp $0, <reg>`
-  codigo[(*pos)++] = 0x83;
-  codigo[(*pos)++] = 0xF8 + reg.reg_code;
-  codigo[(*pos)++] = 0x00;
+  code[(*pos)++] = 0x83;
+  code[(*pos)++] = 0xF8 + reg.reg_code;
+  code[(*pos)++] = 0x00;
 
   // Emite jle <rel32>: coloca opcode e coloca os 4 bytes de offset depois
-  codigo[(*pos)++] = 0x0F;
-  codigo[(*pos)++] = 0x8E;
+  code[(*pos)++] = 0x0F;
+  code[(*pos)++] = 0x8E;
 }
 
 /**
@@ -796,6 +801,7 @@ static RegInfo get_param_reg(int idx) {
 /**
  * 
  */
+//TODO: use W^X
 static void* alloc_wx_buffer(size_t size) {
   // Round to page size
   size_t pagesize = sysconf(_SC_PAGESIZE);
