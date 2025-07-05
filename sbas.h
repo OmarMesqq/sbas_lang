@@ -9,7 +9,12 @@ typedef int (*funcp) ();
 
 /**
  * Compiles a SBas function described in a .sbas file at
- * the open `FILE*` handle `f`, writing the SBas function
- * in the `codigo` buffer
+ * the open `FILE*` handle `f`
  */
-funcp sbasCompile(FILE *f, unsigned char codigo[]);
+funcp sbasCompile(FILE *f);
+
+
+/**
+ * Frees the `mmap`ed buffer of an SBas function `sbasFunc`
+ */
+void sbasCleanup(funcp sbasFunc);

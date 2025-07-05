@@ -3,13 +3,13 @@ OUTPUT := /tmp/sbas
 TEST_OUTPUT := /tmp/sbas_test
 
 debug:
-	gcc -g -Wall -Wextra -Wa,--execstack main.c sbas.c -o $(OUTPUT)
+	gcc -g -Wall -Wextra main.c sbas.c -o $(OUTPUT)
 
 release:
-	gcc -O3 -Wall -Wextra -Wa,--execstack main.c sbas.c -o $(OUTPUT)
+	gcc -O3 -Wall -Wextra  main.c sbas.c -o $(OUTPUT)
 
 test:
-	gcc -g -Wall -Wextra -Wa,--execstack run_tests.c sbas.c -o $(TEST_OUTPUT)
+	gcc -g -Wall -Wextra run_tests.c sbas.c -o $(TEST_OUTPUT)
 
 memleak-check: test
 	@valgrind -s --leak-check=full --track-origins=yes --show-leak-kinds=all /tmp/sbas_test 2> $(VALGRIND_LOG)

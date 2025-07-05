@@ -211,7 +211,6 @@ int main(void) {
 
 static void run_test_parse_full_grammar() {
   FILE* sbasFile;
-  unsigned char code[500];
   funcp sbasFunction;
 
   sbasFile = fopen("test_files/everything.sbas", "r");
@@ -221,17 +220,17 @@ static void run_test_parse_full_grammar() {
   }
   printf("Testing if grammar is correctly parsed.\n");
 
-  sbasFunction = sbasCompile(sbasFile, code);
+  sbasFunction = sbasCompile(sbasFile);
 
   assert(sbasFunction != NULL);
 
   fclose(sbasFile);
+  sbasCleanup(sbasFunction);
   printf(GREEN "Full grammar parse test passed!\n" RESET_COLOR);
 }
 
 static void run_test_callee_saveds() {
   FILE* sbasFile;
-  unsigned char code[500];
   funcp sbasFunction;
 
   sbasFile = fopen("test_files/assign_variables.sbas", "r");
@@ -241,7 +240,7 @@ static void run_test_callee_saveds() {
   }
   printf("Testing if callee-saved registers are preserved...\n");
 
-  sbasFunction = sbasCompile(sbasFile, code);
+  sbasFunction = sbasCompile(sbasFile);
   assert(sbasFunction != NULL);
 
   unsigned long rbx, r12, r13, r14, r15;
@@ -281,6 +280,7 @@ static void run_test_callee_saveds() {
   assert(r15_after == r15 && "r15 was altered and not restored!");
 
   fclose(sbasFile);
+  sbasCleanup(sbasFunction);
   printf(GREEN "Callee-saved registers test passed!\n" RESET_COLOR);
 }
 
@@ -306,7 +306,6 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
 
 
   FILE* sbasFile;
-  unsigned char code[500];
   funcp sbasFunction;
   int res;
 
@@ -316,7 +315,7 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
     return;
   }
 
-  sbasFunction = sbasCompile(sbasFile, code);
+  sbasFunction = sbasCompile(sbasFile);
   assert(sbasFunction != NULL);
 
   switch (paramCount) {
@@ -342,6 +341,7 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
   }
 
   fclose(sbasFile);
+  sbasCleanup(sbasFunction);
   if (res != expected) {
     fprintf(stderr, RED "Test %s FAILED! Expected: %d, got: %d\n" RESET_COLOR, testName, expected, res);
     exit(-1);

@@ -2,11 +2,16 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <string.h>
+#include <errno.h>
 
-#define DEBUG
+// #define DEBUG
 #define VERMELHO "\033[31m"
 #define RESETAR_COR "\033[0m"
 #define MAX_LINHAS 30
+#define MAX_CODE_SIZE 1024
 
 /**
  * Representa uma variável ou símbolo no código-fonte SBas.
@@ -59,8 +64,9 @@ static void escreve_operacao_aritmetica(unsigned char codigo[], int* pos, int id
 static void escreve_cmpl_de_desvio(unsigned char codigo[], int* pos, int varIndex);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
+static void* alloc_wx_buffer(size_t size);
 
-funcp sbasCompile(FILE* f, unsigned char codigo[]) {
+funcp sbasCompile(FILE* f) {
   unsigned line = 1;
   char lineBuffer[256];
   int pos = 0;         // posição no buffer código
@@ -69,13 +75,19 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
   SymbolTable* st = malloc((MAX_LINHAS + 1) * sizeof(SymbolTable));
   RelocationTable* rt = malloc((MAX_LINHAS + 1) * sizeof(RelocationTable));
   if (!st || !rt) {
-    printf("Falha ao alocar tabela de símbolos e/ou dicionário de relocação!\n");
+    fprintf(stderr, "Failed to alloc symbol and/or relocation table!\n");
     return NULL;
   }
+  unsigned char* code = alloc_wx_buffer(MAX_CODE_SIZE);
+  if (!code) {
+      fprintf(stderr, "Failed to alloc W+X memory.\n");
+      exit(1);
+  }
 
-  escreve_prologo(codigo, &pos);
-  salva_regs_callee_saved(codigo, &pos);
-  inicializa_registradores(codigo, &pos);
+
+  escreve_prologo(code, &pos);
+  salva_regs_callee_saved(code, &pos);
+  inicializa_registradores(code, &pos);
 
   /**
    * Primeiro passe no código fonte: emite maior parte das instruções
@@ -90,11 +102,11 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
 
         // retorno de uma variável local (ex.: ret v2)
         if (sscanf(lineBuffer, "ret v%d", &varc) == 1) {
-          escreve_retorno_variavel(codigo, &pos, varc);
+          escreve_retorno_variavel(code, &pos, varc);
         }
         // retorno de uma constante (ex.: ret $-10)
         else if (sscanf(lineBuffer, "ret $%d", &varc) == 1) {
-          escreve_retorno_constante(codigo, &pos, varc);
+          escreve_retorno_constante(code, &pos, varc);
         }
         // erro de sintaxe
         else {
@@ -123,7 +135,7 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
             error("comando inválido: esperada atribuição (vX: <vX|pX|$num>)", line);
           }
-          escreve_atribuicao(codigo, &pos, idxVar, varpcPrefix, idxVarpc);
+          escreve_atribuicao(code, &pos, idxVar, varpcPrefix, idxVarpc);
         }
         // operação aritmética
         else if (operator == '=') {
@@ -142,7 +154,7 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
             error("comando inválido: só são permitidas adição, subtração e multiplicação em SBas", line);
           }
 
-          escreve_operacao_aritmetica(codigo, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
+          escreve_operacao_aritmetica(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
         }
 
         break;
@@ -155,7 +167,7 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
           return NULL;
         }
 
-        escreve_cmpl_de_desvio(codigo, &pos, varIndex);
+        escreve_cmpl_de_desvio(code, &pos, varIndex);
 
         // Reserva espaço para salto condicional na tabela de relocação
         rt[relocCount].lineToBeResolved = lineTarget;
@@ -185,7 +197,7 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
 
     // offset relativo à próxima instrução
     int rel32 = targetOffset - (jumpFrom + 4);
-    escreve_inteiro_em_4bytes_hex(codigo, &jumpFrom, rel32);
+    escreve_inteiro_em_4bytes_hex(code, &jumpFrom, rel32);
   }
   
   free(st);
@@ -195,7 +207,14 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
   printf("sbasCompile wrote %d bytes in buffer.\n", pos);
   #endif
 
-  return (funcp)codigo;
+  return (funcp)code;
+}
+
+/**
+ * Frees the `mmap`ed buffer of an SBas function `sbasFunc`
+ */
+void sbasCleanup(funcp sbasFunc) {
+  munmap((void*) sbasFunc, MAX_CODE_SIZE);
 }
 
 static void error(const char* msg, int line) { 
@@ -772,4 +791,24 @@ static RegInfo get_param_reg(int idx) {
       fprintf(stderr, "get_param_reg: parâmetro inválido: p%d\n", idx);
       return (RegInfo){-1, -1};
   }
+}
+
+/**
+ * 
+ */
+static void* alloc_wx_buffer(size_t size) {
+  // Round to page size
+  size_t pagesize = sysconf(_SC_PAGESIZE);
+
+  size_t alloc_size = ((size + pagesize - 1) / pagesize) * pagesize;
+  void* ptr = mmap(NULL, alloc_size,
+                   PROT_READ | PROT_WRITE | PROT_EXEC,
+                   MAP_PRIVATE | MAP_ANONYMOUS,
+                   -1, 0);
+  if (ptr == MAP_FAILED) {
+    fprintf(stderr, "alloc_wx_buffer: failed to mmap W+X buffer.\n");
+    return NULL;
+  }
+
+  return ptr;
 }
