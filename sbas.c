@@ -57,7 +57,7 @@ static void save_callee_saved_registers(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 static void emit_integer_in_hex(unsigned char code[], int* pos, int inteiro);
-static void emit_constant_literal_return(unsigned char code[], int* pos, int valorRetorno);
+static void emit_constant_literal_return(unsigned char code[], int* pos, int returnValue);
 static void emit_variable_return(unsigned char code[], int* pos, int varIdx);
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
 static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
@@ -458,11 +458,11 @@ static void emit_integer_in_hex(unsigned char code[], int* pos, int inteiro) {
 /**
  * Emits machine code for returning an immediate value (movl $imm32, %eax)
  */
-static void emit_constant_literal_return(unsigned char code[], int* pos, int valorRetorno) {
+static void emit_constant_literal_return(unsigned char code[], int* pos, int returnValue) {
   code[*pos] = 0xb8;  // movl ..., %eax
   (*pos)++;
 
-  emit_integer_in_hex(code, pos, valorRetorno);
+  emit_integer_in_hex(code, pos, returnValue);
 
   restore_callee_saved_registers(code, pos);
   emit_epilogue(code, pos);
@@ -565,8 +565,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
   
   /**
-   * Escreve primeira instrução da operação aritmética:
-   * mov <operandoDaEsquerda>, <variavelAtribuida>
+   * Emits first instruction of an arithmetic operation:
+   * mov <leftOperand>, <attributedVar>
    */
   if (varc1Prefix == 'v') {
     // registrador para registrador: mesma lógica do mov
@@ -590,25 +590,24 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     emit_rex_byte(code, pos, 0, dst.rex);
 
-    // Escreve a instrução mov em si para caso de constante -> registrador
     code[(*pos)++] = 0xB8 + dst.reg_code;
     emit_integer_in_hex(code, pos, idxVarc1);
 
   } else {
-    fprintf(stderr, "Operação aritmética inválida!\n");
+    fprintf(stderr, "emit_arithmetic_operation: invalid varc1Prefix: %c\n", varc1Prefix);
     return;
   }
 
   /**
-   * Escreve segunda instrução da operação aritmética:
-   * <op> <operandoDaDireita>, <variavelAtribuida>
+   * Emits second instruction of an arithmetic operation:
+   * <op> <rightOperand>, <attributedVar>
    */
   if (varc2Prefix == 'v') {
     RegInfo src = get_local_var_reg(idxVarc2);
     RegInfo dst = get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
-    // Exceção para multiplicação: inverte src/dst nos campos do byte REX
+    // Special case for multiplication: src and dst fields are swapped in REX byte
     if (op == '*') {
       char tmp = src.rex;
       src.rex = dst.rex;
@@ -622,11 +621,11 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
       case '-': code[(*pos)++] = 0x29; break;
       case '*': code[(*pos)++] = 0x0F; code[(*pos)++] = 0xAF; break;
       default:
-        fprintf(stderr, "Operação aritmética inválida!\n");
+        fprintf(stderr, "emit_arithmetic_operation: invalid operation: %c\n", op);
         return;
     }
 
-    // Exceção para multiplicação: inverte ordem reg/rm
+    // Special case for multiplication: reg and r/m are swapped in ModRM byte
     if (op == '*') {
       code[(*pos)++] = 0xC0 + (dst.reg_code << 3) + src.reg_code;
     } else {
@@ -642,10 +641,10 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     }    
 
     /**
-     * Emite bytes das operações.
-     * Os ifs para checar se o número cabe em um byte (-128 a 127) é uma otimização que a Intel criou
-     * Valores imediatos pequenos (imm8) tem tamanho diferente das instruções comparado
-     * aos imm32
+     * Emit operations.
+     * The ifs for checking if the number fits in a byte (-128 to 127) are due to
+     * the possibility of emitting bytes for large values (imm32) and smaller ones (imm8).
+     * Not sure if this is optimal though.
      */
     switch (op) {
       case '+': {
@@ -685,7 +684,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         break;
       }
       default:
-        fprintf(stderr, "Operação aritmética inválida: '%c'\n", op);
+        fprintf(stderr, "emit_arithmetic_operation: invalid operation: %c\n", op);
         return;
     }
   }
@@ -704,7 +703,7 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varInd
   }
 
   emit_rex_byte(code, pos, 0, reg.rex);
-
+  
   // Emit `cmp $0, <reg>`
   code[(*pos)++] = 0x83;
   code[(*pos)++] = 0xF8 + reg.reg_code;
@@ -716,15 +715,16 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varInd
 }
 
 /**
- * Retorna o registrador associado a uma variável local v1–v5.
+ * Returns the register where a local variable v1 through v5 is stored
  *
- * O campo `reg_code` é o valor de 3 bits que representa o registrador no byte ModRM.
- * O campo `rex` indica se a variável usa um registrador estendido (r12d–r15d),
- * ou seja, se é necessário emitir um prefixo REX na instrução.
+ * The `reg_code` field is a 3 bit value which represents the register code in the ModRM byte
+ * The `rex` fields indicates if such register is extended (r12d - r15d) i.e. in 
+ * order to access it, a REX prefix byte is necessary.
  *
- * Esta função **não** distingue se o registrador será usado
- * como origem ou destino — ou seja, se deve setar REX.R ou REX.B.
- * Essa decisão cabe à função chamadora, que sabe a posição do operando no ModRM.
+ * The function has no info regarding the usage of the register as source or target. 
+ * The caller knows whether the register is the source (`reg`) or the target (`r/m`) of
+ * the operation in the ModRM byte, and, as such, will set the REX.R or REX.B bits for 
+ * source and target respectively.
  */
 static RegInfo get_local_var_reg(int idx) {
   switch (idx) {
@@ -744,21 +744,17 @@ static RegInfo get_local_var_reg(int idx) {
       // v5 -> r15d
       return (RegInfo){7, 1};
     default:
-      fprintf(stderr, "get_local_var_reg: variável local inválida: v%d\n", idx);
+      fprintf(stderr, "get_local_var_reg: invalid local variable index: v%d\n", idx);
       return (RegInfo){-1, -1};
   }
 }
 
 /**
+ * Returns the register where a parameter p1 through p3 is sent to a function
+ * according to the System V ABI
  * Retorna o registrador associado a um parâmetro p1–p3.
  *
- * O campo `reg_code` indica qual registrador será usado para o parâmetro,
- * segundo a ABI System V vista em aula (edi, esi, edx).
- *
- * O campo `rex` é sempre 0 porque esses registradores não precisam do prefixo REX.
- *
- * Esta função **não determina** se o bit
- * REX.R ou REX.B deve ser usado — isso depende do contexto da instrução.
+ * The `rex` field here is always zero because these registers are not extended.
  */
 static RegInfo get_param_reg(int idx) {
   switch (idx) {
@@ -772,7 +768,7 @@ static RegInfo get_param_reg(int idx) {
       // p3 -> edx
       return (RegInfo){2, 0};
     default:
-      fprintf(stderr, "get_param_reg: parâmetro inválido: p%d\n", idx);
+      fprintf(stderr, "get_param_reg: invalid parameter index: p%d\n", idx);
       return (RegInfo){-1, -1};
   }
 }
