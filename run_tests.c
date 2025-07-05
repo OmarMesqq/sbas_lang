@@ -205,45 +205,44 @@ int main(void) {
   run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2, NULL, 0);
 
 
+  printf(GREEN "All tests passed!\n" RESET_COLOR);
   return 0;
 }
 
 static void run_test_parse_full_grammar() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
+  FILE* sbasFile;
+  unsigned char code[500];
+  funcp sbasFunction;
 
-  arquivoSbas = fopen("test_files/everything.sbas", "r");
-  if (!arquivoSbas) {
+  sbasFile = fopen("test_files/everything.sbas", "r");
+  if (!sbasFile) {
     fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
   printf("Testing if grammar is correctly parsed.\n");
 
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
+  sbasFunction = sbasCompile(sbasFile, code);
 
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
+  assert(sbasFunction != NULL);
 
-  fclose(arquivoSbas);
+  fclose(sbasFile);
   printf(GREEN "Full grammar parse test passed!\n" RESET_COLOR);
 }
 
 static void run_test_callee_saveds() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
+  FILE* sbasFile;
+  unsigned char code[500];
+  funcp sbasFunction;
 
-  arquivoSbas = fopen("test_files/assign_variables.sbas", "r");
-  if (!arquivoSbas) {
+  sbasFile = fopen("test_files/assign_variables.sbas", "r");
+  if (!sbasFile) {
     fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
   printf("Testing if callee-saved registers are preserved...\n");
 
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
+  sbasFunction = sbasCompile(sbasFile, code);
+  assert(sbasFunction != NULL);
 
   unsigned long rbx, r12, r13, r14, r15;
   rbx = 0x11111111;
@@ -262,29 +261,28 @@ static void run_test_callee_saveds() {
       : [val_rbx] "r"(rbx), [val_r12] "r"(r12), [val_r13] "r"(r13), [val_r14] "r"(r14), [val_r15] "r"(r15)
       : "rbx", "r12", "r13", "r14", "r15");
 
-  // Chama a função
-  (*funcaoSBas)();
+  
+  (*sbasFunction)();
 
-  // Carrega registradores depois do uso da função em variáveis
-  unsigned long rbx_depois, r12_depois, r13_depois, r14_depois, r15_depois;
+  // After function is called, load the register values in variables
+  unsigned long rbx_after, r12_after, r13_after, r14_after, r15_after;
   asm volatile(
       "mov %%rbx, %[out_b]\n\t"
       "mov %%r12, %[out_r12]\n\t"
       "mov %%r13, %[out_r13]\n\t"
       "mov %%r14, %[out_r14]\n\t"
       "mov %%r15, %[out_r15]\n\t"
-      : [out_b] "=r"(rbx_depois), [out_r12] "=r"(r12_depois), [out_r13] "=r"(r13_depois), [out_r14] "=r"(r14_depois), [out_r15] "=r"(r15_depois));
+      : [out_b] "=r"(rbx_after), [out_r12] "=r"(r12_after), [out_r13] "=r"(r13_after), [out_r14] "=r"(r14_after), [out_r15] "=r"(r15_after));
 
-  assert(rbx_depois == rbx && "rbx was altered and not restored!");
-  assert(r12_depois == r12 && "r12 was altered and not restored!");
-  assert(r13_depois == r13 && "r13 was altered and not restored!");
-  assert(r14_depois == r14 && "r14 was altered and not restored!");
-  assert(r15_depois == r15 && "r15 was altered and not restored!");
+  assert(rbx_after == rbx && "rbx was altered and not restored!");
+  assert(r12_after == r12 && "r12 was altered and not restored!");
+  assert(r13_after == r13 && "r13 was altered and not restored!");
+  assert(r14_after == r14 && "r14 was altered and not restored!");
+  assert(r15_after == r15 && "r15 was altered and not restored!");
 
-  fclose(arquivoSbas);
+  fclose(sbasFile);
   printf(GREEN "Callee-saved registers test passed!\n" RESET_COLOR);
 }
-
 
 static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected) {
   if (!filePath || !testName) {
@@ -318,22 +316,24 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
     return;
   }
 
-  printf("Running test %s for file %s\n", testName, filePath);
-
   sbasFunction = sbasCompile(sbasFile, code);
   assert(sbasFunction != NULL);
 
   switch (paramCount) {
     case 0:
+      printf("Running test %s for file %s with no params\n", testName, filePath);
       res = (*sbasFunction)();
       break;
     case 1:
+      printf("Running test %s for file %s with one param: p1 = %d\n", testName, filePath, *p1);
       res = sbasFunction(*p1);
       break;
     case 2:
+      printf("Running test %s for file %s with two params: p1 = %d, p2 = %d\n", testName, filePath, *p1, *p2);
       res = sbasFunction(*p1, *p2);
       break;
     case 3:
+      printf("Running test %s for file %s with three params: p1 = %d, p2 = %d, p3 = %d\n", testName, filePath, *p1, *p2, *p3);
       res = sbasFunction(*p1, *p2, *p3);
       break;
     default:
@@ -341,8 +341,9 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
       break;
   }
 
-  assert(res == expected);
-
   fclose(sbasFile);
-  printf("%sTest %s passed for file %s!%s\n", GREEN, testName, filePath, RESET_COLOR);
+  if (res != expected) {
+    fprintf(stderr, RED "Test %s FAILED! Expected: %d, got: %d\n" RESET_COLOR, testName, expected, res);
+    exit(-1);
+  }
 }
