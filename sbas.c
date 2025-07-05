@@ -62,6 +62,7 @@ static void emit_variable_return(unsigned char code[], int* pos, int varIdx);
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
 static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
 static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex);
+static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 static void* alloc_wx_buffer(size_t size);
@@ -97,8 +98,7 @@ funcp sbasCompile(FILE* f) {
   zero_initialize_registers(code, &pos);
 
   /**
-   * First pass: emit most instructions and leave 4-byte "holes"
-   * for jumps
+   * First pass: emit most instructions and leave 4-byte placeholders for jumps
    */
   while (fgets(lineBuffer, sizeof(lineBuffer), f) && line <= MAX_LINES) {
     
@@ -477,10 +477,7 @@ static void emit_variable_return(unsigned char code[], int* pos, int varIdx) {
     return;
   }
 
-  // Escreve byte REX se necessário
-  if (reg.rex) {
-    code[(*pos)++] = 0x44;  // REX com bit R setado em 1 (para reg de origem)
-  }
+  emit_rex_byte(code, pos, reg.rex, 0);
 
   // Escreve byte da operação `mov`
   code[(*pos)++] = 0x89;
@@ -512,13 +509,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     RegInfo dst = get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
-    // Emite byte REX se necessário
-    if (src.rex || dst.rex) {
-      unsigned char rex = 0x40;
-      if (src.rex) rex |= 0x04; // seta o bit R para reg de origem
-      if (dst.rex) rex |= 0x01; // seta o bit B para reg de destino
-      code[(*pos)++] = rex;
-    }
+    emit_rex_byte(code, pos, src.rex, dst.rex);
 
     code[(*pos)++] = 0x89;  // mov
     // cálculo do byte ModRM
@@ -531,10 +522,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
 
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
-    // Emite byte REX se necessário
-    if (dst.rex) {
-      code[(*pos)++] = 0x41;
-    }
+    emit_rex_byte(code, pos, 0, dst.rex);    
 
     code[(*pos)++] = 0x89;  // mov
     // cálculo do byte ModRM
@@ -546,10 +534,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
 
-    // Emite byte REX se necessário
-    if (dst.rex) {
-      code[(*pos)++] = 0x41;
-    }
+    emit_rex_byte(code, pos, 0, dst.rex);
 
     /**
      * Valor imediato para registrador: não usa byte ModRM
@@ -589,13 +574,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     RegInfo dst = get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
-    // Escreve byte REX se necessário
-    if (src.rex || dst.rex) {
-      unsigned char rex = 0x40;
-      if (src.rex) rex |= 0x04;
-      if (dst.rex) rex |= 0x01;
-      code[(*pos)++] = rex;
-    }
+    emit_rex_byte(code, pos, src.rex, dst.rex);
 
     // Escreve byte `mov`
     code[(*pos)++] = 0x89;
@@ -609,10 +588,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
 
-    // Escreve byte REX se necessário (B = 1 para registrador estendido)
-    if (dst.rex) {
-      code[(*pos)++] = 0x41;
-    }
+    emit_rex_byte(code, pos, 0, dst.rex);
 
     // Escreve a instrução mov em si para caso de constante -> registrador
     code[(*pos)++] = 0xB8 + dst.reg_code;
@@ -639,13 +615,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
       dst.rex = tmp;
     }
 
-    // Escreve byte REX se necessário
-    if (src.rex || dst.rex) {
-      unsigned char rex = 0x40;
-      if (src.rex) rex |= 0x04;
-      if (dst.rex) rex |= 0x01;
-      code[(*pos)++] = rex;
-    }
+    emit_rex_byte(code, pos, src.rex, dst.rex);
 
     switch (op) {
       case '+': code[(*pos)++] = 0x01; break;
@@ -667,11 +637,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
 
-    // Emite REX
     if (dst.rex) {
-      unsigned char rex = 0x40;
-      rex |= 0x05;  // seta bit REX.R e REX.B
-      code[(*pos)++] = rex;
+      emit_rex_byte(code, pos, 1, dst.rex);
     }    
 
     /**
@@ -736,10 +703,7 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varInd
     return;
   }
 
-  // Emite REX
-  if (reg.rex) {
-    code[(*pos)++] = 0x41;
-  }
+  emit_rex_byte(code, pos, 0, reg.rex);
 
   // Emit `cmp $0, <reg>`
   code[(*pos)++] = 0x83;
@@ -851,4 +815,18 @@ static void print_relocation_table(RelocationTable* rt, int relocCount) {
     printf("%-20d %d\n", rt[i].lineToBeResolved, rt[i].offset);
   }
   printf("----- END RELOCATION TABLE -----\n");
+}
+
+static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex) {
+  unsigned char rex = 0x40;
+  
+  if (src_rex) {
+    // REX byte with bit R set (for source register)
+    rex |= 0x04;
+  }
+  if (dst_rex) {
+    // REX byte with bit B set (for target register)
+    rex |= 0x01;
+  }
+  code[(*pos)++] = rex;
 }

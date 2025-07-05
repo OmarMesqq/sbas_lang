@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 /**
- * An SBas function:
+ * A SBas function:
  * Pointer to a function that takes `n` parameters (up to 3)
  * and returns a signed 32 integer
  */
