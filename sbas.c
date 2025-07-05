@@ -29,11 +29,11 @@ typedef struct {
  * Represents an entry in the relocation table for conditional jump instructions
  * 
  * Fields:
- * - lineToBeResolved: line in SBas code that has a conditional jump and needs offset patching
- * - offset: position in the buffer where the jump offset needs to be patched.
+ * - lineTarget: line to jump to
+ * - offset: position in the buffer where the jump offset needs to be patched to jump to `lineTarget`
  */
 typedef struct {
-  unsigned char lineToBeResolved;
+  unsigned char lineTarget;
   int offset;
 } RelocationTable;
 
@@ -187,7 +187,7 @@ funcp sbasCompile(FILE* f) {
         emit_cmp_jump_instruction(code, &pos, varIndex);
 
         // Mark current line to be resolved in patching step
-        rt[relocCount].lineToBeResolved = lineTarget;
+        rt[relocCount].lineTarget = lineTarget;
         rt[relocCount].offset = pos;
         relocCount++;
 
@@ -214,10 +214,21 @@ funcp sbasCompile(FILE* f) {
    * Second pass: fills 4-byte placeholder with offsets
    */
   for (int i = 0; i < relocCount; i++) {
-    int targetOffset = st[rt[i].lineToBeResolved].offset;
+    // get start of the line to jump to
+    int targetOffset = st[rt[i].lineTarget].offset;
+    // get the location in buffer to jump from (the 4-byte placeholder to fill)
     int jumpFrom = rt[i].offset;
 
-    // offset relative to the next instruction
+    /**
+     * The CPU processes jumps as:
+     * target_address = next_instruction_address + offset
+     * 
+     * The `jle` instruction is 6 bytes wide: (2 for opcode, 4 for relative offset)
+     * 
+     * Currently, we are at the offset field (`jumpFrom`) since the 2 bytes 
+     * corresponding to the opcode were processed. Now, we add 4 to advance through the
+     * 4 bytes of relative offset (`jumpFrom`) to get to the next instruction.
+     */
     int rel32 = targetOffset - (jumpFrom + 4);
     emit_integer_in_hex(code, &jumpFrom, rel32);
   }
@@ -803,19 +814,18 @@ static int make_buffer_executable(void* ptr, size_t size) {
 
 static void print_symbol_table(SymbolTable* st, int lines) {
   printf("----- START SYMBOL TABLE -----\n");
-  printf("%-14s %s\n", "LINE", "OFFSET (dec)");
+  printf("%-14s %s\n", "LINE", "START OFFSET (dec)");
   for (int i = 1; i < lines; i++) {
     printf("%-14d %d\n", st[i].line, st[i].offset);
   }
   printf("----- END SYMBOL TABLE -----\n");
 }
 
-
 static void print_relocation_table(RelocationTable* rt, int relocCount) {
   printf("----- START RELOCATION TABLE -----\n");
-  printf("%-20s %s\n", "LINE TO PATCH", "OFFSET (dec)");
+  printf("%-20s %s\n", "TARGET LINE", "PATCH OFFSET (dec)");
   for (int i = 0; i < relocCount; i++) {
-    printf("%-20d %d\n", rt[i].lineToBeResolved, rt[i].offset);
+    printf("%-20d %d\n", rt[i].lineTarget, rt[i].offset);
   }
   printf("----- END RELOCATION TABLE -----\n");
 }
