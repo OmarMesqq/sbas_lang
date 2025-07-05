@@ -63,6 +63,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
 static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
 static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex);
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex);
+static void emit_mov(unsigned char code[], int* pos);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 static void* alloc_writable_buffer(size_t size);
@@ -484,8 +485,7 @@ static void emit_variable_return(unsigned char code[], int* pos, int varIdx) {
 
   emit_rex_byte(code, pos, reg.rex, 0);
 
-  // Escreve byte da operação `mov`
-  code[(*pos)++] = 0x89;
+  emit_mov(code, pos);
 
   /**
    * Constrói o byte ModRM:
@@ -516,7 +516,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
 
     emit_rex_byte(code, pos, src.rex, dst.rex);
 
-    code[(*pos)++] = 0x89;  // mov
+    emit_mov(code, pos);
     // cálculo do byte ModRM
     code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
   }
@@ -529,7 +529,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
 
     emit_rex_byte(code, pos, 0, dst.rex);    
 
-    code[(*pos)++] = 0x89;  // mov
+    emit_mov(code, pos);
     // cálculo do byte ModRM
     code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
 
@@ -581,8 +581,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     emit_rex_byte(code, pos, src.rex, dst.rex);
 
-    // Escreve byte `mov`
-    code[(*pos)++] = 0x89;
+    emit_mov(code, pos);
 
     // Escreve ModRM
     code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
@@ -844,4 +843,9 @@ static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst
     rex |= 0x01;
   }
   code[(*pos)++] = rex;
+}
+
+static void emit_mov(unsigned char code[], int* pos) {
+  code[*pos] = 0x89;
+  (*pos)++; 
 }
