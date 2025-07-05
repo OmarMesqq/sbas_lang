@@ -14,11 +14,11 @@
 #define MAX_CODE_SIZE 1024
 
 /**
- * Representa uma variável ou símbolo no código-fonte SBas.
+ * Represents a parsed line in SBas source code
  * 
- * Campos:
- * - line: número da linha onde o símbolo foi declarado.
- * - offset: deslocamento em bytes no stack frame onde a variável está armazenada.
+ * Fields:
+ * - line: current line
+ * - offset: start of current line in the buffer
  */
 typedef struct {
   unsigned char line;
@@ -26,11 +26,11 @@ typedef struct {
 } SymbolTable;
 
 /**
- * Representa uma entrada na tabela de realocação para instruções de desvio condicional.
+ * Represents an entry in the relocation table for conditional jump instructions
  * 
- * Campos:
- * - lineToBeResolved: linha do código SBas que contém o desvio.
- * - offset: posição no código de máquina onde o endereço de destino deve ser preenchido.
+ * Fields:
+ * - lineToBeResolved: line in SBas code that has a conditional jump and needs offset patching
+ * - offset: position in the buffer where the jump offset needs to be patched.
  */
 typedef struct {
   unsigned char lineToBeResolved;
@@ -38,11 +38,11 @@ typedef struct {
 } RelocationTable;
 
 /**
- * Representa um registrador de propósito geral e informações de prefixo REX.
+ * Represents a general purpose register.
  * 
- * Campos:
- * - reg_code: código numérico do registrador (0–7).
- * - rex: flag indicando se o registrador está nos registradores estendidos (8–15).
+ * Fields:
+ * - reg_code: numeric code for register (0–7).
+ * - rex: boolean flag indicating the need for a REX prefix byte necessary for extended registers (8–15).
  */
 typedef struct {
   int reg_code;
@@ -68,6 +68,10 @@ static void* alloc_wx_buffer(size_t size);
 static void print_symbol_table(SymbolTable* st, int lines);
 static void print_relocation_table(RelocationTable* rt, int relocCount);
 
+/**
+ * Compiles a SBas function described in a .sbas file at
+ * the open `FILE*` handle `f`
+ */
 funcp sbasCompile(FILE* f) {
   unsigned line = 1;  // in .sbas file
   char lineBuffer[256]; // for parsing the text lines
@@ -105,17 +109,17 @@ funcp sbasCompile(FILE* f) {
       case 'r': { /* return */
         int varc;
 
-        // retorno de uma variável local (ex.: ret v2)
+        // local variable return (ret vX)
         if (sscanf(lineBuffer, "ret v%d", &varc) == 1) {
           emit_variable_return(code, &pos, varc);
         }
-        // retorno de uma constante (ex.: ret $-10)
+        // constant literal return (ret $snum)
         else if (sscanf(lineBuffer, "ret $%d", &varc) == 1) {
           emit_constant_literal_return(code, &pos, varc);
         }
-        // erro de sintaxe
+        // syntax error!
         else {
-          error("comando 'ret' inválido: esperado 'ret <var|$int>", line);
+          error("invalid 'ret' command: expected 'ret <var|$int>", line);
           return NULL;
         }
 
@@ -125,24 +129,24 @@ funcp sbasCompile(FILE* f) {
         int idxVar;
         char operator;
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
-          error("comando inválido: esperada atribuição (vX: varpc) ou op. aritmética (vX = varc op varc)", line);
+          error("invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
         }
 
-        // Só são permitidas 5 variáveis locais (v1, v2, v3, v4, v5)
+        // Only 5 locals allowed for now (v1, v2, v3, v4, v5)
         if (idxVar < 1 || idxVar > 5) {
-          error("índice de variável inválido: só são permitidas 5 variáveis locais!", line);
+          error("invalid local variable index: only 5 locals are allowed.", line);
         }
 
-        // atribuição
+        // attribution
         if (operator == ':') {
           char varpcPrefix;
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
-            error("comando inválido: esperada atribuição (vX: <vX|pX|$num>)", line);
+            error("invalid attribution: expected 'vX: <vX|pX|$num>'", line);
           }
           emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
         }
-        // operação aritmética
+        // arithmetic operation
         else if (operator == '=') {
           int idxVar;
           char varc1Prefix;
@@ -152,11 +156,11 @@ funcp sbasCompile(FILE* f) {
           int idxVarc2;
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2) != 6) {
-            error("comando inválido: esperada op. aritmética (vX = <vX|$num> op <vX|$num>)", line);
+            error("invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
           }
 
           if (op != '+' && op != '-' && op != '*') {
-            error("comando inválido: só são permitidas adição, subtração e multiplicação em SBas", line);
+            error("invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
           }
 
           emit_arithmetic_operation(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
@@ -168,17 +172,22 @@ funcp sbasCompile(FILE* f) {
         int varIndex;
         unsigned lineTarget;
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
-          error("comando invalido", line);
+          error("invalid 'iflez' command: expected 'iflez vX line'", line);
           return NULL;
         }
 
         emit_cmp_jump_instruction(code, &pos, varIndex);
 
-        // Reserva espaço para salto condicional na tabela de relocação
+        // Mark current line to be resolved in patching step
         rt[relocCount].lineToBeResolved = lineTarget;
         rt[relocCount].offset = pos;
         relocCount++;
-        pos += 4; // 4 bytes para offset
+
+        // Emit 4-byte placeholder
+        code[pos++] = 0x00;
+        code[pos++] = 0x00;
+        code[pos++] = 0x00;
+        code[pos++] = 0x00;
 
         break;
       }
@@ -186,7 +195,7 @@ funcp sbasCompile(FILE* f) {
         continue;
       }
       default:
-        error("comando desconhecido", line);
+        error("unknown SBas command", line);
     }
     line++;
     fscanf(f, " ");
@@ -218,7 +227,7 @@ funcp sbasCompile(FILE* f) {
 }
 
 /**
- * Frees the `mmap`ed buffer of an SBas function `sbasFunc`
+ * Frees the executable buffer of a SBas function `sbasFunc`
  */
 void sbasCleanup(funcp sbasFunc) {
   munmap((void*) sbasFunc, MAX_CODE_SIZE);
@@ -433,7 +442,7 @@ static void emit_epilogue(unsigned char code[], int* pos) {
 
 /**
  * Receives a signed integer (32 bits on x86-64) in base 10 and writes it
- * in Little Endian in the buffer. Used for immediate values and jump offsets.
+ * in Little Endian hexadecimal in the buffer. Used for immediate values and jump offsets.
  */
 static void emit_integer_in_hex(unsigned char code[], int* pos, int inteiro) {
   code[*pos] = inteiro & 0xFF;
@@ -716,13 +725,14 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 }
 
 /**
- * Writes the first instruction of a SBas conditional jump (`iflez`):
+ * Writes first instruction of a SBas conditional jump (`iflez`):
  * cmpl $0, <variableRegister>
+ * as well as the jle conditional jump opcode
  */
 static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex) {
   RegInfo reg = get_local_var_reg(varIndex);
   if (reg.reg_code == -1) {
-    fprintf(stderr, "emit_cmp_jump_instruction: índice de variável inválido: v%d\n", varIndex);
+    fprintf(stderr, "emit_cmp_jump_instruction: invalid variable index: v%d\n", varIndex);
     return;
   }
 
@@ -731,12 +741,12 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varInd
     code[(*pos)++] = 0x41;
   }
 
-  // Emite `cmp $0, <reg>`
+  // Emit `cmp $0, <reg>`
   code[(*pos)++] = 0x83;
   code[(*pos)++] = 0xF8 + reg.reg_code;
   code[(*pos)++] = 0x00;
 
-  // Emite jle <rel32>: coloca opcode e coloca os 4 bytes de offset depois
+  // Emit jle
   code[(*pos)++] = 0x0F;
   code[(*pos)++] = 0x8E;
 }

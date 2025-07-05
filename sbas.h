@@ -15,6 +15,6 @@ funcp sbasCompile(FILE *f);
 
 
 /**
- * Frees the `mmap`ed buffer of an SBas function `sbasFunc`
+ * Frees the executable buffer of a SBas function `sbasFunc`
  */
 void sbasCleanup(funcp sbasFunc);
