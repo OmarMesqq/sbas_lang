@@ -822,7 +822,16 @@ static void print_relocation_table(RelocationTable* rt, int relocCount) {
 }
 
 /**
+ * Emits, if necessary, the prefix REX byte.
+ * This is mandatory for accessing extended registers like r12d through r15d
  * 
+ * If `src_rex` is true, the bit 2, called R, is set, extending the
+ * `reg` field in ModRM (source register).
+ * 
+ * If `dst_rex` is true, the bit 0, called B, is set, extending the
+ * `r/m` field in ModRM (target register).
+ * 
+ * If both are true, both bits are sets and the corresponding fields are extended
  */
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex) {
   unsigned char rex = 0x40;
