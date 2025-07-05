@@ -63,6 +63,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
 static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
 static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex);
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex);
+static void emit_modrm(unsigned char code[], int* pos, int src_reg_code, int dst_reg_code);
 static void emit_mov(unsigned char code[], int* pos);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
@@ -487,54 +488,39 @@ static void emit_variable_return(unsigned char code[], int* pos, int varIdx) {
 
   emit_mov(code, pos);
 
-  /**
-   * Constrói o byte ModRM:
-   * mod | reg | r/m
-   * bb  | bbb | bbb
-   *
-   * Os dois bits 7 e 6 (mod) estão setados em 1, indicando op. entre registradores
-   * Os três bits reg correspondem a reg_code, o registrador de origem
-   * Os três bits r/m indicam o registrador de destino (no caso de retorno, %eax = 000)
-   */
-  unsigned char modrm = 0xC0 + (reg.reg_code << 3);
-  code[(*pos)++] = modrm;
+  // ModRM with `r/m` set to zero: target register is %eax
+  emit_modrm(code, pos, reg.reg_code, 0);
 
   restore_callee_saved_registers(code, pos);
   emit_epilogue(code, pos);
 }
 
 /**
- * Escreve código de máquina de uma atribuição SBas
+ * Emits machine code for a SBas attribution:
  * vX: <vX|pX|$num>
  */
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
-  // atribuição variável-variável
+  // att var to var
   if (varpcPrefix == 'v') {
     RegInfo src = get_local_var_reg(idxVarpc);
     RegInfo dst = get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
     emit_rex_byte(code, pos, src.rex, dst.rex);
-
     emit_mov(code, pos);
-    // cálculo do byte ModRM
-    code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
+    emit_modrm(code, pos, src.reg_code, dst.reg_code);
   }
-  // atribuição variável-parâmetro 
+  // att var param
   else if (varpcPrefix == 'p') {
     RegInfo src = get_param_reg(idxVarpc);
     RegInfo dst = get_local_var_reg(idxVar);
-
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
     emit_rex_byte(code, pos, 0, dst.rex);    
-
     emit_mov(code, pos);
-    // cálculo do byte ModRM
-    code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
-
+    emit_modrm(code, pos, src.reg_code, dst.reg_code);
   } 
-  // atribuição variável-imediato 
+  // att var imm
   else if (varpcPrefix == '$') {
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
@@ -574,17 +560,13 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
    * mov <leftOperand>, <attributedVar>
    */
   if (varc1Prefix == 'v') {
-    // registrador para registrador: mesma lógica do mov
     RegInfo src = get_local_var_reg(idxVarc1);
     RegInfo dst = get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
     emit_rex_byte(code, pos, src.rex, dst.rex);
-
     emit_mov(code, pos);
-
-    // Escreve ModRM
-    code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
+    emit_modrm(code, pos, src.reg_code, dst.reg_code);
 
   } else if (varc1Prefix == '$') {
     // valor imediato para registrador: não usa byte ModRM
@@ -631,10 +613,11 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     // Special case for multiplication: reg and r/m are swapped in ModRM byte
     if (op == '*') {
-      code[(*pos)++] = 0xC0 + (dst.reg_code << 3) + src.reg_code;
-    } else {
-      code[(*pos)++] = 0xC0 + (src.reg_code << 3) + dst.reg_code;
+      int temp = dst.reg_code;
+      dst.reg_code = src.reg_code;
+      src.reg_code = temp;
     }
+    emit_modrm(code, pos, src.reg_code, dst.reg_code);
 
   } else if (varc2Prefix == '$') {
     RegInfo dst = get_local_var_reg(idxVar);
@@ -831,6 +814,9 @@ static void print_relocation_table(RelocationTable* rt, int relocCount) {
   printf("----- END RELOCATION TABLE -----\n");
 }
 
+/**
+ * 
+ */
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex) {
   unsigned char rex = 0x40;
   
@@ -848,4 +834,18 @@ static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst
 static void emit_mov(unsigned char code[], int* pos) {
   code[*pos] = 0x89;
   (*pos)++; 
+}
+
+/**
+ * The ModRM byte tells the CPU what are the operands involved in an operation.
+ * It is built like this:
+ * mod |  reg |  r/m
+ * bb  | bbb  |  bbb
+ * 
+ * The `mod` field is set to 11 which means the operation is between two registers
+ * The 3 bit `reg` field maps to the SOURCE register of the operation
+ * whereas the `r/m` field (also 3 bit wide) maps to the TARGET register
+ */
+static void emit_modrm(unsigned char code[], int* pos, int src_reg_code, int dst_reg_code) {
+  code[(*pos)++] = 0xC0 + (src_reg_code << 3) + dst_reg_code;
 }
