@@ -56,7 +56,7 @@ static void zero_initialize_registers(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
-static void emit_integer_in_hex(unsigned char code[], int* pos, int inteiro);
+static void emit_integer_in_hex(unsigned char code[], int* pos, int integer);
 static void emit_constant_literal_return(unsigned char code[], int* pos, int returnValue);
 static void emit_variable_return(unsigned char code[], int* pos, int varIdx);
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
@@ -451,14 +451,14 @@ static void emit_epilogue(unsigned char code[], int* pos) {
  * Receives a signed integer (32 bits on x86-64) in base 10 and writes it
  * in Little Endian hexadecimal in the buffer. Used for immediate values and jump offsets.
  */
-static void emit_integer_in_hex(unsigned char code[], int* pos, int inteiro) {
-  code[*pos] = inteiro & 0xFF;
+static void emit_integer_in_hex(unsigned char code[], int* pos, int integer) {
+  code[*pos] = integer & 0xFF;
   (*pos)++;
-  code[*pos] = (inteiro >> 8) & 0xFF;
+  code[*pos] = (integer >> 8) & 0xFF;
   (*pos)++;
-  code[*pos] = (inteiro >> 16) & 0xFF;
+  code[*pos] = (integer >> 16) & 0xFF;
   (*pos)++;
-  code[*pos] = (inteiro >> 24) & 0xFF;
+  code[*pos] = (integer >> 24) & 0xFF;
   (*pos)++;
 }
 
@@ -480,9 +480,7 @@ static void emit_constant_literal_return(unsigned char code[], int* pos, int ret
  */
 static void emit_variable_return(unsigned char code[], int* pos, int varIdx) {
   RegInfo reg = get_local_var_reg(varIdx);
-  if (reg.reg_code == -1) {
-    return;
-  }
+  if (reg.reg_code == -1) return;
 
   emit_rex_byte(code, pos, reg.rex, 0);
 
@@ -704,10 +702,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
  */
 static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex) {
   RegInfo reg = get_local_var_reg(varIndex);
-  if (reg.reg_code == -1) {
-    fprintf(stderr, "emit_cmp_jump_instruction: invalid variable index: v%d\n", varIndex);
-    return;
-  }
+  if (reg.reg_code == -1) return;
 
   emit_rex_byte(code, pos, 0, reg.rex);
   
