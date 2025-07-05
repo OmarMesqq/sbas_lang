@@ -1,6 +1,6 @@
 v1 : p1
 iflez v1 5
-v2 = v1 + $1
-iflez v2 5
+v2 = v1 + $-1
+iflez v2 6
 ret $42
 ret $99

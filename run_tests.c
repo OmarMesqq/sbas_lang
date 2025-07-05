@@ -6,71 +6,216 @@
 #include "sbas.h"
 
 #define GREEN "\033[0;32m"
+#define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 
-static void roda_teste_parseia_toda_a_gramatica();
-static void roda_teste_retorno_zero();
-static void roda_teste_retorno_constante();
-static void roda_teste_retorno_variavel();
-static void roda_teste_overflow();
-static void roda_teste_atribuicao_de_constante();
-static void roda_teste_atribuicao_de_parametro();
-static void roda_teste_todos_casos_operacao_aritmetica();
-static void roda_teste_operacao_aritmetica();
-static void roda_teste_soma_um_ao_argumento();
-static void roda_teste_salva_callee_saveds();
-static void roda_teste_diferenca_de_quadrados();
-static void roda_teste_eh_negativo();
-static void roda_teste_fatorial();
-static void roda_teste_retorno_de_um_param();
-static void roda_teste_dead_code();
-static void roda_teste_multiplos_branches();
-static void roda_teste_multiplos_ifs_encadeados();
-static void roda_teste_dois_argumentos();
-static void roda_teste_tres_argumentos();
-static void roda_teste_multiplica_param_por_dez();
-static void roda_teste_multiplica();
-static void roda_teste_subtracao_1();
-static void roda_teste_subtracao_2();
+static void run_test_parse_full_grammar();
+static void run_test_callee_saveds();
 static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected);
 
 int main(void) {
-  roda_teste_parseia_toda_a_gramatica();
-  roda_teste_salva_callee_saveds();
-  roda_teste_retorno_zero();
-  roda_teste_retorno_de_um_param();
-  roda_teste_retorno_constante();
-  roda_teste_retorno_variavel();
-  roda_teste_overflow();
-  roda_teste_atribuicao_de_constante();
-  roda_teste_atribuicao_de_parametro();
-  roda_teste_todos_casos_operacao_aritmetica();
-  roda_teste_soma_um_ao_argumento();
-  roda_teste_operacao_aritmetica();
-  roda_teste_diferenca_de_quadrados();
-  roda_teste_fatorial();
-  roda_teste_eh_negativo();
-  roda_teste_dead_code();
-  roda_teste_multiplos_branches();
-  roda_teste_multiplos_ifs_encadeados();
-  roda_teste_dois_argumentos();
-  roda_teste_tres_argumentos();
-  roda_teste_multiplica_param_por_dez();
-  roda_teste_multiplica();
-  roda_teste_subtracao_1();
-  roda_teste_subtracao_2();
+  run_test_parse_full_grammar();
+  run_test_callee_saveds();
+  
+  int arg1, arg2, arg3;
+
+  run_test("test_files/return_zero.sbas", "return constant literal", 0, NULL, NULL, NULL, 0);
+  
+  arg1 = 16909060;
+  run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL, NULL, 16909060);
+  arg1 = -1253512;
+  run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL, NULL, -1253512);
+  
+  run_test("test_files/return_variable.sbas", "return variable", 0, NULL, NULL, NULL, 5);
+  
+  run_test("test_files/overflow_1.sbas", "overflow 1", 0, NULL, NULL, NULL, -2147483648);
+  run_test("test_files/overflow_2.sbas", "overflow 1", 0, NULL, NULL, NULL, 2147483647);
+
+  run_test("test_files/assign_constant.sbas", "constant attributions", 0, NULL, NULL, NULL, -1004);
+
+  arg1 = 255;
+  arg2 = 0;
+  arg3 = 327;
+  run_test("test_files/assign_parameters.sbas", "parameter attributions", 3, &arg1, &arg2, &arg3, 255);
+
+  run_test("test_files/all_arithmetic_cases.sbas", "all arithmetic operations", 0, NULL, NULL, NULL, -746);
+  
+
+  /**
+   * f(x) = x + 1 tests
+   */
+  arg1 = 0;
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
+  arg1 = -1;
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
+  arg1 = 1;
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
+  arg1 = -5;
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
+  arg1 = INT_MAX;
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, INT_MIN);
+
+  arg1 = 3;
+  run_test("test_files/arithmetic_operation.sbas", "some arithmetic operations", 1, &arg1, NULL, NULL, 2520);
+  
+  /**
+   * a^2 - b^2 tests
+   */
+  arg1 = 4;
+  arg2 = 2;
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 12);
+  arg1 = 5;
+  arg2 = 0;
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 25);
+  arg1 = 7;
+  arg2 = 7;
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 0);
+  arg1 = 10;
+  arg2 = 1;
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 99);
+  arg1 = -3;
+  arg2 = 2;
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 5);
+  arg1 = 0;
+  arg2 = 3;
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, -9);
+  arg1 = -5;
+  arg2 = -4;
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 9);
+
+  /**
+   * Factorial tests
+   */
+  arg1 = 0;
+  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 1);
+  arg1 = 1;
+  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 1);
+  arg1 = 2;
+  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 2);
+  arg1 = 3;
+  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 6);
+  arg1 = 6;
+  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 720);
+  arg1 = 10;
+  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 3628800);
+
+  /**
+   * x + 1 > 0 tests
+   */
+  arg1 = 0;
+  run_test("test_files/is_negative.sbas", "x + 1 > 0", 1, &arg1, NULL, NULL, 0);
+  arg1 = -1;
+  run_test("test_files/is_negative.sbas", "x + 1 > 0", 1, &arg1, NULL, NULL, 1);
+  arg1 = -2;
+  run_test("test_files/is_negative.sbas", "x + 1 > 0", 1, &arg1, NULL, NULL, 1);
+  arg1 = 1;
+  run_test("test_files/is_negative.sbas", "x + 1 > 0", 1, &arg1, NULL, NULL, 0);
+  
+  arg1 = 1;
+  run_test("test_files/dead_code.sbas", "Dead code", 1, &arg1, NULL, NULL, -775);
+
+  /**
+   * Multiple branches tests
+   */
+  arg1 = 0;
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 2);
+  arg1 = -1;
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 2);
+  arg1 = INT_MIN;
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 2);
+  arg1 = 1;
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 3);
+  arg1 = INT_MAX;
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 1);
+
+  /**
+   * Chained ifs tests
+   */
+  arg1 = -2;
+  run_test("test_files/chained_ifs.sbas", "Chained conditionals", 1, &arg1, NULL, NULL, 42);
+  arg1 = 1;
+  run_test("test_files/chained_ifs.sbas", "Chained conditionals", 1, &arg1, NULL, NULL, 99);
+  
+  /**
+   * Two parameters
+   */
+  arg1 = -4;
+  arg2 = 5;
+  run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2, NULL, -4);
+  arg1 = 4;
+  arg2 = 5;
+  run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2, NULL, 68894720);
+  arg1 = -1;
+  arg2 = -7;
+  run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2, NULL, -875);
+
+  /**
+   * Three parameters
+   */
+  arg1 = 1;
+  arg2 = 0;
+  arg3 = -2000;
+  run_test("test_files/three_arguments.sbas", "3 parameters", 3, &arg1, &arg2, &arg3, 256);
+  arg1 = -1;
+  run_test("test_files/three_arguments.sbas", "3 parameters", 3, &arg1, &arg2, &arg3, -444);
+
+
+  /**
+   * Multiply param by 10
+   */
+  arg1 = 0;
+  run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1, &arg1, NULL, NULL, 0);
+  arg1 = 1;
+  run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1, &arg1, NULL, NULL, 10);
+  arg1 = -1;
+  run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1, &arg1, NULL, NULL, -10);
+  
+  /**
+   * Three parameter multiplication
+   */
+  arg1 = 1;
+  arg2 = 1;
+  arg3 = 1;
+  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, -100);
+
+  arg1 = 0;
+  arg2 = 1;
+  arg3 = 1;
+  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, 0);
+
+  arg1 = 5;
+  arg2 = -5;
+  arg3 = 1;
+  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, 2500);
+
+  arg1 = -5;
+  arg2 = -5;
+  arg3 = 1;
+  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, -2500);
+
+  arg1 = -5;
+  arg2 = -5;
+  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 2, &arg1, &arg2, NULL, -2500);
+
+  arg1 = 1;
+  run_test("test_files/subtraction_1.sbas", "Subtraction 1", 1, &arg1, NULL, NULL, 0);
+
+  arg1 = 99;
+  arg2 = 67;
+  run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2, NULL, 0);
+
 
   return 0;
 }
 
-static void roda_teste_parseia_toda_a_gramatica() {
+static void run_test_parse_full_grammar() {
   FILE* arquivoSbas;
   unsigned char codigo[500];
   funcp funcaoSBas;
 
   arquivoSbas = fopen("test_files/everything.sbas", "r");
   if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
+    fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
   printf("Testing if grammar is correctly parsed.\n");
@@ -85,14 +230,14 @@ static void roda_teste_parseia_toda_a_gramatica() {
   printf(GREEN "Full grammar parse test passed!\n" RESET_COLOR);
 }
 
-static void roda_teste_salva_callee_saveds() {
+static void run_test_callee_saveds() {
   FILE* arquivoSbas;
   unsigned char codigo[500];
   funcp funcaoSBas;
 
   arquivoSbas = fopen("test_files/assign_variables.sbas", "r");
   if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
+    fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
   printf("Testing if callee-saved registers are preserved...\n");
@@ -140,652 +285,6 @@ static void roda_teste_salva_callee_saveds() {
   printf(GREEN "Callee-saved registers test passed!\n" RESET_COLOR);
 }
 
-static void roda_teste_retorno_zero() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/return_zero.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  // Obtem o resultado
-  resultado = (*funcaoSBas)();
-
-  // Garante resultado esperado
-  assert(resultado == 0);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de retorno zero passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_retorno_constante() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/return_constant.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  // Obtem o resultado
-  resultado = (*funcaoSBas)();
-
-  // Garante resultado esperado
-  assert(resultado == 16909060);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de retorno de uma constante passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_retorno_de_um_param() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/return_param.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  resultado = (*funcaoSBas)(16909060);  
-  assert(resultado == 16909060);
-
-  resultado = (*funcaoSBas)(-1253512);  
-  assert(resultado == -1253512);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de retorno de um param passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_retorno_variavel() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/return_variable.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  // Obtem o resultado
-  resultado = (*funcaoSBas)();
-
-  // Garante resultado esperado
-  assert(resultado == 5);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de retorno de variável local passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_overflow() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/overflow_1.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-  printf("Testando overflow de INT_MAX em INT_MIN. Arquivo: overflow_1.sbas\n");
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  // Obtem o resultado
-  resultado = (*funcaoSBas)();
-
-  // Espera que INT_MAX + 1 = INT_MIN
-  assert(resultado == -2147483648);
-
-  fclose(arquivoSbas);
-  arquivoSbas = fopen("test_files/overflow_2.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-  printf("Testando overflow de INT_MIN em INT_MAX. Arquivo: overflow_2.sbas\n");
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  // Obtem o resultado
-  resultado = (*funcaoSBas)();
-
-  // Espera que INT_MIN - 1 = INT_MAX
-  assert(resultado == 2147483647);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de overflow passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_atribuicao_de_constante() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/assign_constant.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  resultado = (*funcaoSBas)();
-  assert(resultado == -1004);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de atribuição de constantes passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_atribuicao_de_parametro() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-
-  arquivoSbas = fopen("test_files/assign_parameters.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de atribuição de parâmetros passou!\n" RESET_COLOR);
-}
-
-
-static void roda_teste_todos_casos_operacao_aritmetica() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/all_arithmetic_cases.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas();
-  assert(resultado == -746);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de todos os casos de operações aritméticas passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_operacao_aritmetica() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/arithmetic_operation.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  resultado = (*funcaoSBas)(3);
-
-  assert(resultado == 2520);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de operações aritméticas passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_soma_um_ao_argumento() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/add_one_to_arg.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  // Gera a função
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  // O ponteiro para esta não deve ser NULL
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(0);
-  assert(resultado == 1);
-
-  resultado = funcaoSBas(-1);
-  assert(resultado == 0);
-
-  resultado = funcaoSBas(1);
-  assert(resultado == 2);
-
-  resultado = funcaoSBas(-5);
-  assert(resultado == -4);
-
-  resultado = funcaoSBas(INT_MAX);
-  assert(resultado == INT_MIN);
-
-  resultado = funcaoSBas(INT_MIN - 1);
-  assert(resultado == INT_MIN);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de somar 1 ao primeiro argumento passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_diferenca_de_quadrados() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-
-  arquivoSbas = fopen("test_files/difference_of_squares.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  assert(funcaoSBas != NULL);
-
-  assert(funcaoSBas(4, 2) == 12);   // 16 - 4 = 12
-  assert(funcaoSBas(5, 0) == 25);   // 25 - 0 = 25
-  assert(funcaoSBas(7, 7) == 0);    // 49 - 49 = 0
-  assert(funcaoSBas(10, 1) == 99);  // 100 - 1 = 99
-  assert(funcaoSBas(-3, 2) == 5);   // 9 - 4 = 5
-  assert(funcaoSBas(0, 3) == -9);   // 0 - 9 = -9
-  assert(funcaoSBas(-5, -4) == 9);  // 25 - 16 = 9
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de diferença de quadrados passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_eh_negativo() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/is_negative.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(0);
-  assert(resultado == 0);
-
-  resultado = funcaoSBas(-1);
-  assert(resultado == 1);
-
-  resultado = funcaoSBas(-2);
-  assert(resultado == 1);
-
-  resultado = funcaoSBas(1);
-  assert(resultado == 0);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de se número somado a um é negativo passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_fatorial() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/factorial.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(0);
-  assert(resultado == 1);
-
-  resultado = funcaoSBas(1);
-  assert(resultado == 1);
-
-  assert(funcaoSBas(2) == 2);     // 2! = 2
-  assert(funcaoSBas(3) == 6);     // 3! = 6
-  assert(funcaoSBas(4) == 24);    // 4! = 24
-  assert(funcaoSBas(5) == 120);   // 5! = 120
-
-  assert(funcaoSBas(6) == 720);
-  assert(funcaoSBas(7) == 5040);
-  assert(funcaoSBas(8) == 40320);
-  assert(funcaoSBas(10) == 3628800);
-
-
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de fatorial passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_dead_code() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/dead_code.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  printf("Testando dead code. Arquivo: dead_code.sbas\n");
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(0);
-  assert(resultado == -775);
-  assert(resultado != 6);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de dead code passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_multiplos_branches() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/multiple_branches.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(0);
-  assert(resultado == 2);
-
-  resultado = funcaoSBas(-1);
-  assert(resultado == 2);
-
-  resultado = funcaoSBas(INT_MIN);
-  assert(resultado == 2);
-
-
-  resultado = funcaoSBas(1);
-  assert(resultado == 3);
-
-  resultado = funcaoSBas(INT_MAX);
-  assert(resultado == 1);
-
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de múltiplos branches de execução (ifs) passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_multiplos_ifs_encadeados() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/chained_ifs.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(-2);
-  assert(resultado == 42);
-
-  resultado = funcaoSBas(0);
-  assert(resultado == 42);
-
-
-  resultado = funcaoSBas(-1);
-  assert(resultado == 42);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de múltiplos ifs encadeados passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_dois_argumentos() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/two_arguments.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(-4, 5);
-  assert(resultado == -4);
-
-  resultado = funcaoSBas(4, 5);
-  assert(resultado == 68894720);
-
-  resultado = funcaoSBas(-1, -7);
-  assert(resultado == -875);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de dois argumentos com iflez passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_tres_argumentos() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/three_arguments.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(1, 0, -2000);
-  assert(resultado == 256);
-
-  resultado = funcaoSBas(-1, 0, -2000);
-  assert(resultado == -444);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de três argumentos com iflez passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_multiplica_param_por_dez() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/multiply_param_by_10.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(0);
-  assert(resultado == 0);
-
-  resultado = funcaoSBas(1);
-  assert(resultado == 10);
-
-  resultado = funcaoSBas(-1);
-  assert(resultado == -10);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de multiplicar argumento por 10 passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_multiplica() {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/multiplication.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(1, 1, 1);
-  assert(resultado == -100);
-
-  resultado = funcaoSBas(0, 1, 1);
-  assert(resultado == 0);
-
-  resultado = funcaoSBas(5, -5, 1);
-  assert(resultado == 2500);
-
-  resultado = funcaoSBas(-5, -5, 1);
-  assert(resultado == -2500);
-
-  resultado = funcaoSBas(-5, -5);
-  assert(resultado == -2500);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de multiplicação passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_subtracao_1()  {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/subtraction_1.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(1);
-  assert(resultado == 0);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de subtração 1 passou!\n" RESET_COLOR);
-}
-
-static void roda_teste_subtracao_2()  {
-  FILE* arquivoSbas;
-  unsigned char codigo[500];
-  funcp funcaoSBas;
-  int resultado;
-
-  arquivoSbas = fopen("test_files/subtraction_2.sbas", "r");
-  if (!arquivoSbas) {
-    printf("Falha ao abrir arquivo SBas para leitura!\n");
-    return;
-  }
-
-  funcaoSBas = sbasCompile(arquivoSbas, codigo);
-  assert(funcaoSBas != NULL);
-
-  resultado = funcaoSBas(99, 67);
-  assert(resultado == 0);
-
-  fclose(arquivoSbas);
-  printf(GREEN "Teste de subtração 2 passou!\n" RESET_COLOR);
-}
 
 static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected) {
   if (!filePath || !testName) {
@@ -815,7 +314,7 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
 
   sbasFile = fopen(filePath, "r");
   if (!sbasFile) {
-    fprintf(stderr, "Could not open sbas file: %s.\n", filePath);
+    fprintf(stderr, RED "Could not open sbas file: %s.\n" RESET_COLOR, filePath);
     return;
   }
 
@@ -824,7 +323,24 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
   sbasFunction = sbasCompile(sbasFile, code);
   assert(sbasFunction != NULL);
 
-  res = sbasFunction(99, 67);
+  switch (paramCount) {
+    case 0:
+      res = (*sbasFunction)();
+      break;
+    case 1:
+      res = sbasFunction(*p1);
+      break;
+    case 2:
+      res = sbasFunction(*p1, *p2);
+      break;
+    case 3:
+      res = sbasFunction(*p1, *p2, *p3);
+      break;
+    default:
+      fprintf(stderr, RED "run_tests: invalid paramCount: %d" RESET_COLOR, paramCount);
+      break;
+  }
+
   assert(res == expected);
 
   fclose(sbasFile);
