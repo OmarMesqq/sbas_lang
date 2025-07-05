@@ -65,6 +65,7 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varInd
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex);
 static void emit_modrm(unsigned char code[], int* pos, int src_reg_code, int dst_reg_code);
 static void emit_mov(unsigned char code[], int* pos);
+static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code, int integer);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 static void* alloc_writable_buffer(size_t size);
@@ -543,13 +544,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     if (dst.reg_code == -1) return;
 
     emit_rex_byte(code, pos, 0, dst.rex);
-
-    /**
-     * Valor imediato para registrador: não usa byte ModRM
-     * A regra é: 0xB8 + (número do registrador), seguido de 4 bytes do inteiro
-     */
-    code[(*pos)++] = 0xB8 + dst.reg_code;
-    emit_integer_in_hex(code, pos, idxVarpc);
+    emit_mov_imm(code, pos, dst.reg_code, idxVarpc);
   }
 }
 
@@ -586,16 +581,12 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     emit_modrm(code, pos, src.reg_code, dst.reg_code);
 
   } else if (varc1Prefix == '$') {
-    // valor imediato para registrador: não usa byte ModRM
-    // A regra é: 0xB8 + (número do registrador), seguido de 4 bytes do inteiro
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
 
     emit_rex_byte(code, pos, 0, dst.rex);
 
-    code[(*pos)++] = 0xB8 + dst.reg_code;
-    emit_integer_in_hex(code, pos, idxVarc1);
-
+    emit_mov_imm(code, pos, dst.reg_code, idxVarc1);
   } else {
     fprintf(stderr, "emit_arithmetic_operation: invalid varc1Prefix: %c\n", varc1Prefix);
     return;
@@ -864,4 +855,14 @@ static void emit_mov(unsigned char code[], int* pos) {
  */
 static void emit_modrm(unsigned char code[], int* pos, int src_reg_code, int dst_reg_code) {
   code[(*pos)++] = 0xC0 + (src_reg_code << 3) + dst_reg_code;
+}
+
+/**
+ * Emits `mov` $imm, <reg>.
+ * Does not use ModRM byte, rather:
+ * 0xB8 + dst_reg_code followed by 4 bytes of imm
+ */
+static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code, int integer) {
+  code[(*pos)++] = 0xB8 + dst_reg_code;
+  emit_integer_in_hex(code, pos, integer);
 }
