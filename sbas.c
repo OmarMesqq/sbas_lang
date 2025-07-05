@@ -7,7 +7,7 @@
 #include <string.h>
 #include <errno.h>
 
-// #define DEBUG
+#define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 30
@@ -65,6 +65,8 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varInd
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 static void* alloc_wx_buffer(size_t size);
+static void print_symbol_table(SymbolTable* st, int lines);
+static void print_relocation_table(RelocationTable* rt, int lines);
 
 funcp sbasCompile(FILE* f) {
   unsigned line = 1;  // in .sbas file
@@ -201,14 +203,15 @@ funcp sbasCompile(FILE* f) {
     int rel32 = targetOffset - (jumpFrom + 4);
     emit_integer_in_hex(code, &jumpFrom, rel32);
   }
-  
-  free(st);
-  free(rt);
 
   #ifdef DEBUG
   printf("sbasCompile wrote %d bytes in buffer.\n", pos);
+  print_symbol_table(st, line);
+  print_relocation_table(rt, line);
   #endif
 
+  free(st);
+  free(rt);
   return (funcp)code;
 }
 
@@ -817,4 +820,23 @@ static void* alloc_wx_buffer(size_t size) {
   }
 
   return ptr;
+}
+
+static void print_symbol_table(SymbolTable* st, int lines) {
+  printf("----- START SYMBOL TABLE -----\n");
+  printf("%-14s %s\n", "LINE", "OFFSET (dec)");
+  for (int i = 1; i < lines + 1; i++) {
+    printf("%-14d %d\n", st[i].line, st[i].offset);
+  }
+  printf("----- END SYMBOL TABLE -----\n");
+}
+
+
+static void print_relocation_table(RelocationTable* rt, int lines) {
+  printf("----- START RELOCATION TABLE -----\n");
+  printf("%-20s %s\n", "LINE TO PATCH", "OFFSET (dec)");
+  for (int i = 1; i < lines + 1; i++) {
+    printf("%-20d %d\n", rt[i].lineToBeResolved, rt[i].offset);
+  }
+  printf("----- END RELOCATION TABLE -----\n");
 }
