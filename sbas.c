@@ -65,7 +65,8 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varInd
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
-static void* alloc_wx_buffer(size_t size);
+static void* alloc_writable_buffer(size_t size);
+static int make_buffer_executable(void* ptr, size_t size);
 static void print_symbol_table(SymbolTable* st, int lines);
 static void print_relocation_table(RelocationTable* rt, int relocCount);
 
@@ -86,9 +87,9 @@ funcp sbasCompile(FILE* f) {
     return NULL;
   }
 
-  unsigned char* code = alloc_wx_buffer(MAX_CODE_SIZE);
+  unsigned char* code = alloc_writable_buffer(MAX_CODE_SIZE);
   if (!code) {
-    fprintf(stderr, "Failed to alloc W+X memory.\n");
+    fprintf(stderr, "Failed to alloc writable memory.\n");
     return NULL;
   }
 
@@ -223,6 +224,12 @@ funcp sbasCompile(FILE* f) {
 
   free(st);
   free(rt);
+
+  int res = make_buffer_executable(code, MAX_CODE_SIZE);
+  if (res == -1) {
+    return NULL;
+  }
+
   return (funcp)code;
 }
 
@@ -774,24 +781,41 @@ static RegInfo get_param_reg(int idx) {
 }
 
 /**
- * 
+ * Allocates a RW buffer for emitting machine code
+ * corresponding to SBas code semantics
  */
-//TODO: use W^X
-static void* alloc_wx_buffer(size_t size) {
+static void* alloc_writable_buffer(size_t size) {
   // Round to page size
   size_t pagesize = sysconf(_SC_PAGESIZE);
 
   size_t alloc_size = ((size + pagesize - 1) / pagesize) * pagesize;
   void* ptr = mmap(NULL, alloc_size,
-                   PROT_READ | PROT_WRITE | PROT_EXEC,
+                   PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS,
                    -1, 0);
   if (ptr == MAP_FAILED) {
-    fprintf(stderr, "alloc_wx_buffer: failed to mmap W+X buffer.\n");
+    fprintf(stderr, "alloc_writable_buffer: failed to mmap writable buffer.\n");
     return NULL;
   }
 
   return ptr;
+}
+
+/**
+ * Drops write flag of SBas code buffer after done emitting.
+ * This enforces W^X security policy
+ */
+static int make_buffer_executable(void* ptr, size_t size) {
+  size_t pagesize = sysconf(_SC_PAGESIZE);
+  size_t alloc_size = ((size + pagesize - 1) / pagesize) * pagesize;
+
+  // change protection to R+X (drop Write)
+  if (mprotect(ptr, alloc_size, PROT_READ | PROT_EXEC) != 0) {
+    fprintf(stderr, "make_buffer_executable: failed to set buffer to R+X through mprotect.\n");
+    return -1;
+  }
+
+  return 0;
 }
 
 static void print_symbol_table(SymbolTable* st, int lines) {
