@@ -165,6 +165,9 @@ funcp sbasCompile(FILE* f, unsigned char codigo[]) {
 
         break;
       }
+      case '/': {
+        continue;
+      }
       default:
         error("comando desconhecido", line);
     }

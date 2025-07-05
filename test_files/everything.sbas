@@ -1,22 +1,39 @@
+// att:= 'p'num
 v5:p3
 v1 :p2
 v3: p1
+
+// att:= var
 v4:v2
+
+// att:= $snum
 v2:$-45
 v1: $0
+
+// expr:= var op var
 v1 = v2 + v3
 v1 = v2 - v3
 v1 = v2 * v3
+
+// expr:= $snum op $snum
 v1 = $1 + $57
 v1 = $0 - $1
 v1 = $144 * $2
+
+// expr:= var op $snum
 v1 = v2 + $4
 v1 = v2 - $-1
 v1 = v2 * $9999
+
+// expr:= $snum op var
 v1 = $1 + v1
 v1 = $0 - v3
 v1 = $144 * v5
+
+// dif:= iflez var num
 iflez v5 4
+
+// ret:= ret <var|$snum>
 ret v3
 ret $0
 ret $-1
