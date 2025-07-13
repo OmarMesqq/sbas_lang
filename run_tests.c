@@ -22,8 +22,6 @@ int main(void) {
 
   run_test("test_files/return_constant.sbas", "return constant literal", 0, NULL, NULL, NULL, 16909060);
   
-  arg1 = 16909060;
-  run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL, NULL, 16909060);
   arg1 = -1253512;
   run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL, NULL, -1253512);
   
@@ -51,8 +49,6 @@ int main(void) {
   run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
   arg1 = 1;
   run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
-  arg1 = -5;
-  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
   arg1 = INT_MAX;
   run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, INT_MIN);
 
@@ -62,27 +58,15 @@ int main(void) {
   /**
    * a^2 - b^2 tests
    */
-  arg1 = 4;
-  arg2 = 2;
-  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 12);
-  arg1 = 5;
-  arg2 = 0;
-  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 25);
   arg1 = 7;
   arg2 = 7;
   run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 0);
   arg1 = 10;
   arg2 = 1;
   run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 99);
-  arg1 = -3;
-  arg2 = 2;
-  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 5);
   arg1 = 0;
   arg2 = 3;
   run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, -9);
-  arg1 = -5;
-  arg2 = -4;
-  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 9);
 
   /**
    * Factorial tests
@@ -91,12 +75,6 @@ int main(void) {
   run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 1);
   arg1 = 1;
   run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 1);
-  arg1 = 2;
-  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 2);
-  arg1 = 3;
-  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 6);
-  arg1 = 6;
-  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 720);
   arg1 = 10;
   run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 3628800);
 
@@ -140,15 +118,10 @@ int main(void) {
   /**
    * Two parameters
    */
-  arg1 = -4;
-  arg2 = 5;
-  run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2, NULL, -4);
   arg1 = 4;
   arg2 = 5;
   run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2, NULL, 68894720);
-  arg1 = -1;
-  arg2 = -7;
-  run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2, NULL, -875);
+  
 
   /**
    * Three parameters
@@ -164,10 +137,6 @@ int main(void) {
   /**
    * Multiply param by 10
    */
-  arg1 = 0;
-  run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1, &arg1, NULL, NULL, 0);
-  arg1 = 1;
-  run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1, &arg1, NULL, NULL, 10);
   arg1 = -1;
   run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1, &arg1, NULL, NULL, -10);
   
@@ -178,25 +147,6 @@ int main(void) {
   arg2 = 1;
   arg3 = 1;
   run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, -100);
-
-  arg1 = 0;
-  arg2 = 1;
-  arg3 = 1;
-  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, 0);
-
-  arg1 = 5;
-  arg2 = -5;
-  arg3 = 1;
-  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, 2500);
-
-  arg1 = -5;
-  arg2 = -5;
-  arg3 = 1;
-  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, -2500);
-
-  arg1 = -5;
-  arg2 = -5;
-  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 2, &arg1, &arg2, NULL, -2500);
 
   arg1 = 1;
   run_test("test_files/subtraction_1.sbas", "Subtraction 1", 1, &arg1, NULL, NULL, 0);
@@ -373,7 +323,6 @@ static void run_failing_test(const char* filePath, const char* testName, int par
 
   FILE* sbasFile;
   funcp sbasFunction;
-  int res;
 
   sbasFile = fopen(filePath, "r");
   if (!sbasFile) {

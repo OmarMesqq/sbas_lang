@@ -7,7 +7,7 @@
 #include <string.h>
 #include <errno.h>
 
-#define DEBUG
+// #define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 30
