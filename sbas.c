@@ -83,8 +83,8 @@ funcp sbasCompile(FILE* f) {
   int pos = 0;         // byte position in the buffer
   int relocCount = 0;  // how many lines should have jump offsets patched in the 2nd pass
 
-  SymbolTable* st = malloc((MAX_LINES + 1) * sizeof(SymbolTable));
-  RelocationTable* rt = malloc((MAX_LINES + 1) * sizeof(RelocationTable));
+  SymbolTable* st = calloc((MAX_LINES + 1), sizeof(SymbolTable));
+  RelocationTable* rt = calloc((MAX_LINES + 1), sizeof(RelocationTable));
   if (!st || !rt) {
     fprintf(stderr, "Failed to alloc symbol and/or relocation table!\n");
     return NULL;
@@ -105,6 +105,11 @@ funcp sbasCompile(FILE* f) {
    * First pass: emit most instructions and leave 4-byte placeholders for jumps
    */
   while (fgets(lineBuffer, sizeof(lineBuffer), f) && line <= MAX_LINES) {
+    // Skip comment lines, but still increase the parsed lines counter
+    if (lineBuffer[0] == '/') {
+      line++;
+      continue;
+    }
     
     st[line].line = line;
     st[line].offset = pos;
@@ -199,9 +204,6 @@ funcp sbasCompile(FILE* f) {
         code[pos++] = 0x00;
 
         break;
-      }
-      case '/': { /* comment */
-        continue;
       }
       default:
         error("unknown SBas command", line);
@@ -807,6 +809,7 @@ static void print_symbol_table(SymbolTable* st, int lines) {
   printf("----- START SYMBOL TABLE -----\n");
   printf("%-14s %s\n", "LINE", "START OFFSET (dec)");
   for (int i = 1; i < lines; i++) {
+    if (st[i].line == 0) continue; 
     printf("%-14d %d\n", st[i].line, st[i].offset);
   }
   printf("----- END SYMBOL TABLE -----\n");
