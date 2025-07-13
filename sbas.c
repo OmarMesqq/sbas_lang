@@ -217,6 +217,11 @@ funcp sbasCompile(FILE* f) {
    * Second pass: fills 4-byte placeholder with offsets
    */
   for (int i = 0; i < relocCount; i++) {
+    if (st[rt[i].lineTarget].line == 0) {
+      error("jump target is not an executable line", rt[i].lineTarget);
+      return NULL;
+    }
+
     // get start of the line to jump to
     int targetOffset = st[rt[i].lineTarget].offset;
     // get the location in buffer to jump from (the 4-byte placeholder to fill)
