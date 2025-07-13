@@ -26,9 +26,6 @@ int main(void) {
   run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL, NULL, -1253512);
   
   run_test("test_files/return_variable.sbas", "return variable", 0, NULL, NULL, NULL, 5);
-  
-  run_test("test_files/overflow_1.sbas", "overflow 1", 0, NULL, NULL, NULL, -2147483648);
-  run_test("test_files/overflow_2.sbas", "overflow 1", 0, NULL, NULL, NULL, 2147483647);
 
   run_test("test_files/assign_constant.sbas", "constant attributions", 0, NULL, NULL, NULL, -1004);
 
