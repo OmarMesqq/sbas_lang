@@ -12,6 +12,7 @@
 static void run_test_parse_full_grammar();
 static void run_test_callee_saveds();
 static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected);
+static void run_failing_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3);
 
 int main(void) {
   run_test_parse_full_grammar();
@@ -204,6 +205,7 @@ int main(void) {
   arg2 = 67;
   run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2, NULL, 0);
 
+  run_failing_test("test_files/wrong_return.sbas", "Bad return", 0, NULL, NULL, NULL);
 
   printf(GREEN "All tests passed!\n" RESET_COLOR);
   return 0;
@@ -346,4 +348,43 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
     fprintf(stderr, RED "Test %s FAILED! Expected: %d, got: %d\n" RESET_COLOR, testName, expected, res);
     exit(-1);
   }
+}
+
+static void run_failing_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3) {
+  if (!filePath || !testName) {
+    fprintf(stderr, "run_test: filePath or testName were not passed.\n");
+    return;
+  }
+
+  if (paramCount < 0 || paramCount > 3) {
+    fprintf(stderr, "run_test: SBas functions have between 0 and 3 arguments.\n");
+    return;
+  }
+
+  if ((paramCount == 1) && p1 == NULL) {
+    return;
+  } 
+  if ((paramCount == 2) && ((p1 == NULL) || (p2 == NULL))) {
+    return;
+  } if ((paramCount == 3) && ((p1 == NULL) || (p2 == NULL) || (p3 == NULL))) {
+    return;
+  }
+
+
+  FILE* sbasFile;
+  funcp sbasFunction;
+  int res;
+
+  sbasFile = fopen(filePath, "r");
+  if (!sbasFile) {
+    fprintf(stderr, RED "Could not open sbas file: %s.\n" RESET_COLOR, filePath);
+    return;
+  }
+
+  sbasFunction = sbasCompile(sbasFile);
+  assert(sbasFunction == NULL);
+
+  fclose(sbasFile);
+  sbasCleanup(sbasFunction);
+  fprintf(stderr, GREEN "Test %s for failing case PASSED!\n" RESET_COLOR, testName);
 }
