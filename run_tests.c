@@ -20,7 +20,7 @@ int main(void) {
   
   int arg1, arg2, arg3;
 
-  run_test("test_files/return_zero.sbas", "return constant literal", 0, NULL, NULL, NULL, 0);
+  run_test("test_files/return_constant.sbas", "return constant literal", 0, NULL, NULL, NULL, 16909060);
   
   arg1 = 16909060;
   run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL, NULL, 16909060);
