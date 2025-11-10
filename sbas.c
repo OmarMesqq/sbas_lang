@@ -8,7 +8,7 @@
 #include <errno.h>
 
 // uncomment this for useful logs during SBas function compilation
-// #define DEBUG
+#define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 30
@@ -80,18 +80,22 @@ static void print_relocation_table(RelocationTable* rt, int relocCount);
  */
 funcp sbasCompile(FILE* f) {
   unsigned line = 1;  // in .sbas file
-  char lineBuffer[256]; // for parsing the text lines
+  char lineBuffer[256]; // will hold a line in .sbas file
   int pos = 0;         // byte position in the buffer
-  int relocCount = 0;  // how many lines should have jump offsets patched in the 2nd pass
+  int relocCount = 0;  // holds how many lines should have jump offsets written in the second pass
+  SymbolTable* st;
+  RelocationTable* rt;
+  unsigned char* code;
+  int mprotectRes;
 
-  SymbolTable* st = calloc((MAX_LINES + 1), sizeof(SymbolTable));
-  RelocationTable* rt = calloc((MAX_LINES + 1), sizeof(RelocationTable));
+  st = calloc((MAX_LINES + 1), sizeof(SymbolTable));
+  rt = calloc((MAX_LINES + 1), sizeof(RelocationTable));
   if (!st || !rt) {
-    fprintf(stderr, "Failed to alloc symbol and/or relocation table!\n");
+    fprintf(stderr, "sbasCompile: failed to alloc symbol and/or relocation table!\n");
     return NULL;
   }
 
-  unsigned char* code = alloc_writable_buffer(MAX_CODE_SIZE);
+  code = alloc_writable_buffer(MAX_CODE_SIZE);
   if (!code) {
     fprintf(stderr, "sbasCompile: failed to alloc writable memory.\n");
     free(st);
@@ -125,13 +129,15 @@ funcp sbasCompile(FILE* f) {
         if (sscanf(lineBuffer, "ret v%d", &varc) == 1) {
           emit_variable_return(code, &pos, varc);
         }
+
         // constant literal return (ret $snum)
         else if (sscanf(lineBuffer, "ret $%d", &varc) == 1) {
           emit_constant_literal_return(code, &pos, varc);
         }
+
         // syntax error!
         else {
-          error("invalid 'ret' command: expected 'ret <var|$int>", line);
+          error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
           free(st);
           free(rt);
           return NULL;
@@ -142,8 +148,9 @@ funcp sbasCompile(FILE* f) {
       case 'v': { /* attribution and arithmetic operation */
         int idxVar;
         char operator;
+
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
-          error("invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
+          error("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
           free(st);
           free(rt);
           return NULL;
@@ -151,7 +158,7 @@ funcp sbasCompile(FILE* f) {
 
         // Only 5 locals allowed for now (v1, v2, v3, v4, v5)
         if (idxVar < 1 || idxVar > 5) {
-          error("invalid local variable index: only 5 locals are allowed.", line);
+          error("sbasCompile: invalid local variable index: only 5 locals are allowed.", line);
           free(st);
           free(rt);
           return NULL;
@@ -162,7 +169,7 @@ funcp sbasCompile(FILE* f) {
           char varpcPrefix;
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
-            error("invalid attribution: expected 'vX: <vX|pX|$num>'", line);
+            error("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
             free(st);
             free(rt);
             return NULL;
@@ -179,14 +186,14 @@ funcp sbasCompile(FILE* f) {
           int idxVarc2;
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2) != 6) {
-            error("invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
+            error("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
             free(st);
             free(rt);
             return NULL;
           }
 
           if (op != '+' && op != '-' && op != '*') {
-            error("invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
+            error("sbasCompile: invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
             free(st);
             free(rt);
             return NULL;
@@ -201,7 +208,7 @@ funcp sbasCompile(FILE* f) {
         int varIndex;
         unsigned lineTarget;
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
-          error("invalid 'iflez' command: expected 'iflez vX line'", line);
+          error("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
           free(st);
           free(rt);
           return NULL;
@@ -223,7 +230,7 @@ funcp sbasCompile(FILE* f) {
         break;
       }
       default:
-        error("unknown SBas command", line);
+        error("sbasCompile: unknown SBas command", line);
         free(st);
         free(rt);
         return NULL;
@@ -237,7 +244,7 @@ funcp sbasCompile(FILE* f) {
    */
   for (int i = 0; i < relocCount; i++) {
     if (st[rt[i].lineTarget].line == 0) {
-      error("jump target is not an executable line", rt[i].lineTarget);
+      error("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
       free(st);
       free(rt);
       return NULL;
@@ -273,8 +280,9 @@ funcp sbasCompile(FILE* f) {
   free(st);
   free(rt);
 
-  int res = make_buffer_executable(code, MAX_CODE_SIZE);
-  if (res == -1) {
+  mprotectRes = make_buffer_executable(code, MAX_CODE_SIZE);
+  if (mprotectRes == -1) {
+    fprintf(stderr, "sbasCompile: failed to make_buffer_executable\n");
     return NULL;
   }
 
@@ -815,8 +823,7 @@ static void* alloc_writable_buffer(size_t size) {
 }
 
 /**
- * Drops write flag of SBas code buffer after done emitting.
- * This enforces W^X security policy
+ * Drops write flag of SBas code buffer after done emitting, enforcing W^X
  */
 static int make_buffer_executable(void* ptr, size_t size) {
   size_t pagesize = sysconf(_SC_PAGESIZE);
