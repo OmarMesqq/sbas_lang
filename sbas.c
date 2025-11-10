@@ -93,7 +93,9 @@ funcp sbasCompile(FILE* f) {
 
   unsigned char* code = alloc_writable_buffer(MAX_CODE_SIZE);
   if (!code) {
-    fprintf(stderr, "Failed to alloc writable memory.\n");
+    fprintf(stderr, "sbasCompile: failed to alloc writable memory.\n");
+    free(st);
+    free(rt);
     return NULL;
   }
 
