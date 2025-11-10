@@ -15,16 +15,16 @@
 #define MAX_CODE_SIZE 1024
 
 /**
- * Represents a parsed line in SBas source code
+ * Maps each line in `.sbas` file to its offset in the machine code buffer
  * 
  * Fields:
- * - line: current line
- * - offset: start of current line in the buffer
+ * - line: line in `.sbas` file
+ * - offset: start of the line's instructions in the buffer
  */
 typedef struct {
   unsigned char line;
   int offset;
-} SymbolTable;
+} LineTable;
 
 /**
  * Represents an entry in the relocation table for conditional jump instructions
@@ -71,7 +71,7 @@ static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 static void* alloc_writable_buffer(size_t size);
 static int make_buffer_executable(void* ptr, size_t size);
-static void print_symbol_table(SymbolTable* st, int lines);
+static void print_line_table(LineTable* lt, int lines);
 static void print_relocation_table(RelocationTable* rt, int relocCount);
 
 /**
@@ -83,26 +83,25 @@ funcp sbasCompile(FILE* f) {
   char lineBuffer[256]; // will hold a line in .sbas file
   int pos = 0;         // byte position in the buffer
   int relocCount = 0;  // holds how many lines should have jump offsets written in the second pass
-  SymbolTable* st;
+  LineTable* lt;
   RelocationTable* rt;
   unsigned char* code;
   int mprotectRes;
 
-  st = calloc((MAX_LINES + 1), sizeof(SymbolTable));
+  lt = calloc((MAX_LINES + 1), sizeof(LineTable));
   rt = calloc((MAX_LINES + 1), sizeof(RelocationTable));
-  if (!st || !rt) {
-    fprintf(stderr, "sbasCompile: failed to alloc symbol and/or relocation table!\n");
+  if (!lt || !rt) {
+    fprintf(stderr, "sbasCompile: failed to alloc line and/or relocation table!\n");
     return NULL;
   }
 
   code = alloc_writable_buffer(MAX_CODE_SIZE);
   if (!code) {
     fprintf(stderr, "sbasCompile: failed to alloc writable memory.\n");
-    free(st);
+    free(lt);
     free(rt);
     return NULL;
   }
-
 
   emit_prologue(code, &pos);
   save_callee_saved_registers(code, &pos);
@@ -118,8 +117,8 @@ funcp sbasCompile(FILE* f) {
       continue;
     }
     
-    st[line].line = line;
-    st[line].offset = pos;
+    lt[line].line = line;
+    lt[line].offset = pos;
 
     switch (lineBuffer[0]) {
       case 'r': { /* return */
@@ -138,7 +137,7 @@ funcp sbasCompile(FILE* f) {
         // syntax error!
         else {
           error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
-          free(st);
+          free(lt);
           free(rt);
           return NULL;
         }
@@ -151,7 +150,7 @@ funcp sbasCompile(FILE* f) {
 
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
           error("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
-          free(st);
+          free(lt);
           free(rt);
           return NULL;
         }
@@ -159,7 +158,7 @@ funcp sbasCompile(FILE* f) {
         // Only 5 locals allowed for now (v1, v2, v3, v4, v5)
         if (idxVar < 1 || idxVar > 5) {
           error("sbasCompile: invalid local variable index: only 5 locals are allowed.", line);
-          free(st);
+          free(lt);
           free(rt);
           return NULL;
         }
@@ -170,7 +169,7 @@ funcp sbasCompile(FILE* f) {
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
             error("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
-            free(st);
+            free(lt);
             free(rt);
             return NULL;
           }
@@ -187,14 +186,14 @@ funcp sbasCompile(FILE* f) {
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2) != 6) {
             error("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
-            free(st);
+            free(lt);
             free(rt);
             return NULL;
           }
 
           if (op != '+' && op != '-' && op != '*') {
             error("sbasCompile: invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
-            free(st);
+            free(lt);
             free(rt);
             return NULL;
           }
@@ -209,7 +208,7 @@ funcp sbasCompile(FILE* f) {
         unsigned lineTarget;
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
           error("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
-          free(st);
+          free(lt);
           free(rt);
           return NULL;
         }
@@ -231,7 +230,7 @@ funcp sbasCompile(FILE* f) {
       }
       default:
         error("sbasCompile: unknown SBas command", line);
-        free(st);
+        free(lt);
         free(rt);
         return NULL;
     }
@@ -243,15 +242,15 @@ funcp sbasCompile(FILE* f) {
    * Second pass: fills 4-byte placeholder with offsets
    */
   for (int i = 0; i < relocCount; i++) {
-    if (st[rt[i].lineTarget].line == 0) {
+    if (lt[rt[i].lineTarget].line == 0) {
       error("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
-      free(st);
+      free(lt);
       free(rt);
       return NULL;
     }
 
     // get start of the line to jump to
-    int targetOffset = st[rt[i].lineTarget].offset;
+    int targetOffset = lt[rt[i].lineTarget].offset;
     // get the location in buffer to jump from (the 4-byte placeholder to fill)
     int jumpFrom = rt[i].offset;
 
@@ -270,14 +269,13 @@ funcp sbasCompile(FILE* f) {
   }
 
   #ifdef DEBUG
-  printf("sbasCompile wrote %d bytes in buffer.\n", pos);
-  printf("Parsed %d lines.\n", line);
-  printf("%d lines were patched.\n", relocCount);
-  print_symbol_table(st, line);
+  printf("sbasCompile parsed %d lines, writing %d bytes in buffer\n", line, pos);
+  printf("%d lines were patched\n", relocCount);
+  print_line_table(lt, line);
   print_relocation_table(rt, relocCount);
   #endif
 
-  free(st);
+  free(lt);
   free(rt);
 
   mprotectRes = make_buffer_executable(code, MAX_CODE_SIZE);
@@ -838,14 +836,14 @@ static int make_buffer_executable(void* ptr, size_t size) {
   return 0;
 }
 
-static void print_symbol_table(SymbolTable* st, int lines) {
-  printf("----- START SYMBOL TABLE -----\n");
+static void print_line_table(LineTable* lt, int lines) {
+  printf("----- START LINE TABLE -----\n");
   printf("%-14s %s\n", "LINE", "START OFFSET (dec)");
   for (int i = 1; i < lines; i++) {
-    if (st[i].line == 0) continue; 
-    printf("%-14d %d\n", st[i].line, st[i].offset);
+    if (lt[i].line == 0) continue; 
+    printf("%-14d %d\n", lt[i].line, lt[i].offset);
   }
-  printf("----- END SYMBOL TABLE -----\n");
+  printf("----- END LINE TABLE -----\n");
 }
 
 static void print_relocation_table(RelocationTable* rt, int relocCount) {
