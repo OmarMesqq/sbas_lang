@@ -69,9 +69,16 @@ static int stringToInt(char* str) {
     int num;
     size_t ssize;
     int digit;
+    int isNegative = 0;
 
     num = 0;
     ssize = strlen(str);
+
+    if (*str == '-') {
+        isNegative = 1;
+        ssize--;    // disregard minus sign
+        str++;
+    }    
 
     while(*str != '\0') {
         digit = *str - 48;  // 48 is ASCII code for '0', so we always get the corresponding int to a char
@@ -80,5 +87,9 @@ static int stringToInt(char* str) {
         str++;
     }
 
+    if (isNegative) {
+        num *= -1;
+    }
+    
     return num;
 }
