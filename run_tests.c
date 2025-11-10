@@ -15,10 +15,10 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
 static void run_failing_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3);
 
 int main(void) {
+  int arg1, arg2, arg3;
+
   run_test_parse_full_grammar();
   run_test_callee_saveds();
-  
-  int arg1, arg2, arg3;
 
   run_test("test_files/return_constant.sbas", "return constant literal", 0, NULL, NULL, NULL, 16909060);
   
@@ -152,12 +152,18 @@ int main(void) {
   arg2 = 67;
   run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2, NULL, 0);
 
+  printf("Testing wrong syntax files...\n");
   run_failing_test("test_files/wrong_return.sbas", "Bad return", 0, NULL, NULL, NULL);
 
   printf(GREEN "All tests passed!\n" RESET_COLOR);
   return 0;
 }
 
+/**
+ * Compiles an SBas file containing all grammar. Expects to be successfully parsed.
+ * The logic in this file doesn't make sense really, the only assertion is whether
+ * the compiler can correctly parse it.
+ */
 static void run_test_parse_full_grammar() {
   FILE* sbasFile;
   funcp sbasFunction;
@@ -175,9 +181,12 @@ static void run_test_parse_full_grammar() {
 
   fclose(sbasFile);
   sbasCleanup(sbasFunction);
-  printf(GREEN "Full grammar parse test passed!\n" RESET_COLOR);
 }
 
+/**
+ * Compiles an SBas file that loads values to callee-saved registers.
+ * It is expected that these values are restored at the function epilogue.
+ */
 static void run_test_callee_saveds() {
   FILE* sbasFile;
   funcp sbasFunction;
@@ -230,9 +239,18 @@ static void run_test_callee_saveds() {
 
   fclose(sbasFile);
   sbasCleanup(sbasFunction);
-  printf(GREEN "Callee-saved registers test passed!\n" RESET_COLOR);
 }
 
+/**
+ * Compiles an `.sbas` file and asserts its return result
+ * @param filePath relative or absoulute path to the `.sbas` file
+ * @param testName name of the test echoed in `stdout`
+ * @param paramCount amount of parameters that the SBas function takes [0, 3]
+ * @param p1 pointer to the first parameter of SBas function
+ * @param p2 pointer to the second parameter of SBas function
+ * @param p3 pointer to the third parameter of SBas function
+ * @param expected value to assert on SBas function return
+ */
 static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected) {
   if (!filePath || !testName) {
     fprintf(stderr, "run_test: filePath or testName were not passed.\n");
@@ -297,6 +315,15 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
   }
 }
 
+/**
+ * Attempts to compile an incorrect `.sbas` file and asserts compilation failure
+ * @param filePath relative or absoulute path to the `.sbas` file
+ * @param testName name of the test echoed in `stdout`
+ * @param paramCount amount of parameters that the SBas function takes [0, 3]
+ * @param p1 pointer to the first parameter of SBas function
+ * @param p2 pointer to the second parameter of SBas function
+ * @param p3 pointer to the third parameter of SBas function
+ */
 static void run_failing_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3) {
   if (!filePath || !testName) {
     fprintf(stderr, "run_test: filePath or testName were not passed.\n");
@@ -332,5 +359,4 @@ static void run_failing_test(const char* filePath, const char* testName, int par
 
   fclose(sbasFile);
   sbasCleanup(sbasFunction);
-  fprintf(stderr, GREEN "Test %s for failing case PASSED!\n" RESET_COLOR, testName);
 }
