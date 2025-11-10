@@ -130,6 +130,8 @@ funcp sbasCompile(FILE* f) {
         // syntax error!
         else {
           error("invalid 'ret' command: expected 'ret <var|$int>", line);
+          free(st);
+          free(rt);
           return NULL;
         }
 
@@ -140,12 +142,16 @@ funcp sbasCompile(FILE* f) {
         char operator;
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
           error("invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
+          free(st);
+          free(rt);
           return NULL;
         }
 
         // Only 5 locals allowed for now (v1, v2, v3, v4, v5)
         if (idxVar < 1 || idxVar > 5) {
           error("invalid local variable index: only 5 locals are allowed.", line);
+          free(st);
+          free(rt);
           return NULL;
         }
 
@@ -155,6 +161,8 @@ funcp sbasCompile(FILE* f) {
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
             error("invalid attribution: expected 'vX: <vX|pX|$num>'", line);
+            free(st);
+            free(rt);
             return NULL;
           }
           emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
@@ -170,11 +178,15 @@ funcp sbasCompile(FILE* f) {
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2) != 6) {
             error("invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
+            free(st);
+            free(rt);
             return NULL;
           }
 
           if (op != '+' && op != '-' && op != '*') {
             error("invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
+            free(st);
+            free(rt);
             return NULL;
           }
 
@@ -188,6 +200,8 @@ funcp sbasCompile(FILE* f) {
         unsigned lineTarget;
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
           error("invalid 'iflez' command: expected 'iflez vX line'", line);
+          free(st);
+          free(rt);
           return NULL;
         }
 
@@ -208,6 +222,8 @@ funcp sbasCompile(FILE* f) {
       }
       default:
         error("unknown SBas command", line);
+        free(st);
+        free(rt);
         return NULL;
     }
     line++;
@@ -220,6 +236,8 @@ funcp sbasCompile(FILE* f) {
   for (int i = 0; i < relocCount; i++) {
     if (st[rt[i].lineTarget].line == 0) {
       error("jump target is not an executable line", rt[i].lineTarget);
+      free(st);
+      free(rt);
       return NULL;
     }
 
@@ -255,6 +273,8 @@ funcp sbasCompile(FILE* f) {
 
   int res = make_buffer_executable(code, MAX_CODE_SIZE);
   if (res == -1) {
+    free(st);
+    free(rt);
     return NULL;
   }
 
