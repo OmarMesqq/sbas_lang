@@ -273,8 +273,6 @@ funcp sbasCompile(FILE* f) {
 
   int res = make_buffer_executable(code, MAX_CODE_SIZE);
   if (res == -1) {
-    free(st);
-    free(rt);
     return NULL;
   }
 
