@@ -7,6 +7,7 @@
 #include <string.h>
 #include <errno.h>
 
+// uncomment this for useful logs during SBas function compilation
 // #define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
@@ -273,7 +274,7 @@ static void error(const char* msg, int line) {
 
 /**
  * Starts an x86-64 function. Saves previous frame base pointer
- * and configure current stack frame.
+ * and configures current stack frame.
  */
 static void emit_prologue(unsigned char code[], int* pos) {
   // pushq %rbp

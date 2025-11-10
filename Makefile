@@ -3,10 +3,10 @@ OUTPUT := /tmp/sbas
 TEST_OUTPUT := /tmp/sbas_test
 
 debug:
-	gcc -g -Wall -Wextra main.c sbas.c -o $(OUTPUT)
+	gcc -g -Wall -Wextra main.c sbas.c -o $(OUTPUT) -lm
 
 release:
-	gcc -O3 -Wall -Wextra  main.c sbas.c -o $(OUTPUT)
+	gcc -O3 -Wall -Wextra  main.c sbas.c -o $(OUTPUT) -lm
 
 test:
 	gcc -g -Wall -Wextra run_tests.c sbas.c -o $(TEST_OUTPUT)
