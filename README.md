@@ -5,19 +5,19 @@ You need a Linux machine, `gcc`, `make`, and optionally, `valgrind` to detect me
 
 
 ## The compiler:
-### building the debug variant:
+### Building the debug variant:
 ```
 make debug
 ```
 
-### building the release variant:
+### Building the release variant:
 ```
 make release
 ```
 
 The compiler will be saved on `/tmp/sbas` by default.
 
-### usage:
+### Usage:
 ```
 ./sbas foo.sbas <arg1> <arg2> <arg3>
 ```
