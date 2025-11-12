@@ -54,7 +54,6 @@ typedef struct {
 
 static void error(const char* msg, int line);
 static void emit_prologue(unsigned char code[], int* pos);
-static void zero_initialize_registers(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
@@ -106,7 +105,6 @@ funcp sbasCompile(FILE* f) {
 
   emit_prologue(code, &pos);
   save_callee_saved_registers(code, &pos);
-  zero_initialize_registers(code, &pos);
 
   /**
    * First pass: emit most instructions and leave 4-byte placeholders for jumps
@@ -317,51 +315,6 @@ static void emit_prologue(unsigned char code[], int* pos) {
   (*pos)++;
 }
 
-/**
- * Even though uninitialized variables are not accepted per
- * SBas specification, I zero initialized all local variable registers.
- */
-static void zero_initialize_registers(unsigned char code[], int* pos) {
-  // xorl %ebx,%ebx
-  code[*pos] = 0x31;
-  (*pos)++;
-  code[*pos] = 0xdb;
-  (*pos)++;
-
-  // xorl  %r12d,%r12d
-  code[*pos] = 0x45;
-  (*pos)++;
-  code[*pos] = 0x31;
-  (*pos)++;
-  code[*pos] = 0xe4;
-  (*pos)++;
-
-
-  // xorl  %r13d, %r13d
-  code[*pos] = 0x45;
-  (*pos)++;
-  code[*pos] = 0x31;
-  (*pos)++;
-  code[*pos] = 0xed;
-  (*pos)++;
-
-  // xorl  %r14d, %r14d
-  code[*pos] = 0x45;
-  (*pos)++;
-  code[*pos] = 0x31;
-  (*pos)++;
-  code[*pos] = 0xf6;
-  (*pos)++;
-
-  // xorl  %r15d, %r15d
-  code[*pos] = 0x45;
-  (*pos)++;
-  code[*pos] = 0x31;
-  (*pos)++;
-  code[*pos] = 0xff;
-  (*pos)++;
-
-}
 
 /**
  * I mapped the SBas local variables to callee-saved registers. As such,
