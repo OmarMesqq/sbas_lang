@@ -40,11 +40,11 @@ typedef struct {
 } RelocationTable;
 
 /**
- * Represents a general purpose register.
+ * Contains information about a x86-64 general purpose register.
  * 
  * Fields:
  * - reg_code: numeric code for register (0–7).
- * - rex: boolean flag indicating the need for a REX prefix byte necessary for extended registers (8–15).
+ * - rex: boolean flag signaling the need for a REX prefix byte (used in extended registers 8 through 15).
  */
 typedef struct {
   int reg_code;
@@ -293,6 +293,9 @@ void sbasCleanup(funcp sbasFunc) {
   munmap((void*) sbasFunc, MAX_CODE_SIZE);
 }
 
+/**
+ * Prints a SBas compilation error `msg`, found at a given `line`, to `stderr`
+ */
 static void error(const char* msg, int line) { 
   fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg, RESET_COLOR);
 }
@@ -317,13 +320,15 @@ static void emit_prologue(unsigned char code[], int* pos) {
 
 
 /**
- * I mapped the SBas local variables to callee-saved registers. As such,
- * they have to be saved in the stack frame for later restoration.
- * v1 - ebx
- * v2 - r12d
- * v3 - r13d
- * v4 - r14d
- * v5 - r15d
+ * Decrements the stack pointer by 48 bytes and saves the initial values
+ * of the callee-saved registers in the stack frame.
+ * 
+ * Since SBas local variables (v1 through v5) are mapped to callee-saved registers,
+ * the latter's initial values have to be saved for later restoration
+ * as to comply with the System V ABI.
+ * 
+ * The extra 8 bytes may be unused, but are crucial as they guarantee the stack
+ * is aligned at a 16-byte boundary (another ABI requirement)
  */
 static void save_callee_saved_registers(unsigned char code[], int* pos) {
   // subq $48, %rsp
@@ -388,7 +393,7 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
 }
 
 /**
- * Restore callee-saved registers at the end of an SBas function
+ * Restores callee-saved registers values stored in the stack frame
  */
 static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   // movq -8(%rbp), %rbx
@@ -443,7 +448,7 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos) {
 }
 
 /**
- * Undoes current stack frame: emits leave and ret
+ * Undoes the current stack frame: emits leave and ret
  */
 static void emit_epilogue(unsigned char code[], int* pos) {
   //leave
