@@ -65,7 +65,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex);
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst_rex);
 static void emit_modrm(unsigned char code[], int* pos, int src_reg_code, int dst_reg_code);
-static void emit_mov(unsigned char code[], int* pos);
+static inline void emit_mov(unsigned char code[], int* pos);
 static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code, int integer);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
@@ -835,7 +835,10 @@ static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst
   code[(*pos)++] = rex;
 }
 
-static void emit_mov(unsigned char code[], int* pos) {
+/**
+ * Emits `mov` instruction
+ */
+static inline void emit_mov(unsigned char code[], int* pos) {
   code[*pos] = 0x89;
   (*pos)++; 
 }
