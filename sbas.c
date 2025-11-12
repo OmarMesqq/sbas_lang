@@ -27,15 +27,16 @@ typedef struct {
 } LineTable;
 
 /**
- * Represents an entry in the relocation table for conditional jump instructions
+ * Maps placeholders for conditional jumps at a given `offset` in the buffer
+ * to the desired `lineTarget` in the `.sbas` file to jump to
  * 
  * Fields:
- * - lineTarget: line to jump to
- * - offset: position in the buffer where the jump offset needs to be patched to jump to `lineTarget`
+ * - offset: position in the buffer where the jump offset needs to be patched to jump to `lineTarget` 
+ * - lineTarget: line to jump to 
  */
 typedef struct {
-  unsigned char lineTarget;
   int offset;
+  unsigned char lineTarget;
 } RelocationTable;
 
 /**
@@ -848,9 +849,9 @@ static void print_line_table(LineTable* lt, int lines) {
 
 static void print_relocation_table(RelocationTable* rt, int relocCount) {
   printf("----- START RELOCATION TABLE -----\n");
-  printf("%-20s %s\n", "TARGET LINE", "PATCH OFFSET (dec)");
+  printf("%-20s %s\n", "PATCH OFFSET (dec)", "TARGET LINE");
   for (int i = 0; i < relocCount; i++) {
-    printf("%-20d %d\n", rt[i].lineTarget, rt[i].offset);
+    printf("%-20d %d\n", rt[i].offset, rt[i].lineTarget);
   }
   printf("----- END RELOCATION TABLE -----\n");
 }
