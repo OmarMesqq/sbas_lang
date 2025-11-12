@@ -78,7 +78,7 @@ static int stringToInt(char* str) {
         isNegative = 1;
         ssize--;    // disregard minus sign
         str++;
-    }    
+    }
 
     while(*str != '\0') {
         digit = *str - 48;  // 48 is ASCII code for '0', so we always get the corresponding int to a char
