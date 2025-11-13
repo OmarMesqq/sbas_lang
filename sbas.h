@@ -1,3 +1,5 @@
+#ifndef SBAS_H
+#define SBAS_H
 #include <stdio.h>
 
 /**
@@ -19,3 +21,5 @@ funcp sbasCompile(FILE *f);
  * @param sbasFunc the SBas function pointer to free
  */
 void sbasCleanup(funcp sbasFunc);
+
+#endif

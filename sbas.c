@@ -83,10 +83,10 @@ funcp sbasCompile(FILE* f) {
   char lineBuffer[256]; // will hold a line in .sbas file
   int pos = 0;         // byte position in the buffer
   int relocCount = 0;  // holds how many lines should have jump offsets written in the second pass
+  unsigned char* code;  // buffer to write SBas logic
+  int mprotectRes;      // holds status of syscall to make buffer executable
   LineTable* lt;
   RelocationTable* rt;
-  unsigned char* code;
-  int mprotectRes;
 
   // Edge case handling: empty file
   fseek(f, 0, SEEK_END); // Seek to the end of the file
