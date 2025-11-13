@@ -119,13 +119,21 @@ funcp sbasCompile(FILE* f) {
   /**
    * First pass: emit most instructions and leave 4-byte placeholders for jumps
    */
-  while (fgets(lineBuffer, sizeof(lineBuffer), f) && line <= MAX_LINES) {
+  while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
     printf("lineBuffer: %s\n", lineBuffer);
     printf("lineBuffer[0]: %c (str), %d (dec), %02x (hex)\n", lineBuffer[0], lineBuffer[0], lineBuffer[0]);
     // Skip comment lines, but still increase the parsed lines counter
     if (lineBuffer[0] == '/') {
       line++;
       continue;
+    }
+
+    if (line > MAX_LINES) {
+      fprintf(stderr, "sbasCompile: the provided SBas file exceeds MAX_LINES (%d)!\n", MAX_LINES);
+      free(lt);
+      free(rt);
+      sbasCleanup((funcp) code);
+      return NULL;
     }
     
     lt[line].line = line;
