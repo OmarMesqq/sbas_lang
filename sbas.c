@@ -11,7 +11,7 @@
 // #define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
-#define MAX_LINES 30
+#define MAX_LINES 50
 #define MAX_CODE_SIZE 1024
 
 /**

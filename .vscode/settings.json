@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        ".gdbinit": "plaintext",
+        "sbas.h": "c"
+    }
+}
