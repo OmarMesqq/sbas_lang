@@ -73,6 +73,7 @@ static void* alloc_writable_buffer(size_t size);
 static int make_buffer_executable(void* ptr, size_t size);
 static void print_line_table(LineTable* lt, int lines);
 static void print_relocation_table(RelocationTable* rt, int relocCount);
+static void trim_line(char* lineBuffer);
 
 /**
  * Compiles a SBas function described in a .sbas file at
@@ -312,6 +313,26 @@ funcp sbasCompile(FILE* f) {
  */
 void sbasCleanup(funcp sbasFunc) {
   munmap((void*) sbasFunc, MAX_CODE_SIZE);
+}
+
+static void trim_line(char* lineBuffer) {
+  char* p = lineBuffer;
+  unsigned empties = 0;
+  unsigned ssize = 0;
+
+  while (*p != '\0') {
+    if (*p == ' ') {    
+      empties++;
+    }
+    p++;
+    ssize++;
+  }
+  
+  for (int i = 0; i < ssize; i++) {
+    lineBuffer[i] = lineBuffer[i + empties];
+  }
+
+ 
 }
 
 /**
