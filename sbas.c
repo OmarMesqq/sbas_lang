@@ -7,8 +7,8 @@
 #include <string.h>
 #include <errno.h>
 
-// uncomment this for useful logs during SBas function compilation
-// #define DEBUG
+// shows useful logs during SBas function compilation
+#define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 50
@@ -120,8 +120,6 @@ funcp sbasCompile(FILE* f) {
    * First pass: emit most instructions and leave 4-byte placeholders for jumps
    */
   while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
-    printf("lineBuffer: %s\n", lineBuffer);
-    printf("lineBuffer[0]: %c (str), %d (dec), %02x (hex)\n", lineBuffer[0], lineBuffer[0], lineBuffer[0]);
     // Skip comment lines, but still increase the parsed lines counter
     if (lineBuffer[0] == '/') {
       line++;
@@ -135,6 +133,9 @@ funcp sbasCompile(FILE* f) {
       sbasCleanup((funcp) code);
       return NULL;
     }
+
+    printf("[line %d] lineBuffer is: %s\n", line, lineBuffer);
+    // printf("lineBuffer[0]: %c (str), %d (dec), %02x (hex)\n", lineBuffer[0], lineBuffer[0], lineBuffer[0]);
     
     lt[line].line = line;
     lt[line].offset = pos;
