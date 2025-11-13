@@ -8,7 +8,7 @@
 #include <errno.h>
 
 // uncomment this for useful logs during SBas function compilation
-#define DEBUG
+// #define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 30
@@ -87,6 +87,16 @@ funcp sbasCompile(FILE* f) {
   RelocationTable* rt;
   unsigned char* code;
   int mprotectRes;
+
+  // Edge case handling: empty file
+  fseek(f, 0, SEEK_END); // Seek to the end of the file
+  long size = ftell(f); // Get the current file position: its size
+  if (size == 0) {
+    fprintf(stderr, "sbasCompile: the provided SBas file is empty.\n");
+    return NULL;
+  } else {
+    rewind(f); // go back to file's start
+  }
 
   lt = calloc((MAX_LINES + 1), sizeof(LineTable));
   rt = calloc((MAX_LINES + 1), sizeof(RelocationTable));

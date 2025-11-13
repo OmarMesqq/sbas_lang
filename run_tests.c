@@ -154,6 +154,7 @@ int main(void) {
 
   printf("Testing wrong syntax files...\n");
   run_failing_test("test_files/wrong_return.sbas", "Bad return", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/empty.sbas", "Empty file", 0, NULL, NULL, NULL);
 
   printf(GREEN "All tests passed!\n" RESET_COLOR);
   return 0;
