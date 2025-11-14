@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include <string.h>
-#include <math.h>
 
 #include "sbas.h"
 
@@ -62,28 +60,28 @@ int main(int argc, char* argv[]) {
 }
 
 /**
- * Converts null-terminated string to an integer
- * @param str 
+ * Converts the null-terminated string `str` to an integer.
+ * Runs in O(n) - single pass.
+ * Doesn't correctly handle broken inputs such as those with space, letters
+ * and overflowing integers
  */
 static int stringToInt(char* str) {
-    int num;
-    size_t ssize;
-    int digit;
+    int num = 0;
+    int digit = 0;
     int isNegative = 0;
 
-    num = 0;
-    ssize = strlen(str);
-
+    // is first char a minus sign?
     if (*str == '-') {
         isNegative = 1;
-        ssize--;    // disregard minus sign
         str++;
     }
 
     while(*str != '\0') {
-        digit = *str - 48;  // 48 is ASCII code for '0', so we always get the corresponding int to a char
-        digit = digit * pow(10, --ssize);
-        num += digit;
+        // subtract the value of the digit char from 0 in ASCII table, getting its true value
+        digit = *str - '0';
+        // each new digit "adds" another power of 10 to the overall number
+        num *= 10;
+        num += digit; 
         str++;
     }
 
