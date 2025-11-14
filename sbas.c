@@ -73,7 +73,7 @@ static void* alloc_writable_buffer(size_t size);
 static int make_buffer_executable(void* ptr, size_t size);
 static void print_line_table(LineTable* lt, int lines);
 static void print_relocation_table(RelocationTable* rt, int relocCount);
-static void trim_line(char* lineBuffer);
+static void trim_leading_spaces(char* lineBuffer);
 static void dump_str(char* s);
 
 /**
@@ -127,6 +127,13 @@ funcp sbasCompile(FILE* f) {
       line++;
       continue;
     }
+    trim_leading_spaces(lineBuffer);
+    
+    if (lineBuffer[0] == ' ' || lineBuffer[0] == '\n') {
+      printf("skipping line %d (spaces/newline):\n", line);
+      line++;
+      continue;
+    }
 
     if (line > MAX_LINES) {
       fprintf(stderr, "sbasCompile: the provided SBas file exceeds MAX_LINES (%d)!\n", MAX_LINES);
@@ -136,7 +143,7 @@ funcp sbasCompile(FILE* f) {
       return NULL;
     }
 
-    printf("[line %d] lineBuffer is: %s\n", line, lineBuffer);
+    // printf("[line %d] lineBuffer is: %s\n", line, lineBuffer);
     // printf("lineBuffer[0]: %c (str), %d (dec), %02x (hex)\n", lineBuffer[0], lineBuffer[0], lineBuffer[0]);
     
     lt[line].line = line;
@@ -257,7 +264,6 @@ funcp sbasCompile(FILE* f) {
         return NULL;
     }
     line++;
-    fscanf(f, " ");
   }
 
   /**
@@ -327,24 +333,27 @@ static void dump_str(char* s) {
   printf("\n");
 }
 
-static void trim_line(char* lineBuffer) {
+static void trim_leading_spaces(char* lineBuffer) {
   char* p = lineBuffer;
-  unsigned empties = 0;
-  unsigned ssize = 0;
+  if (*p != ' ') {
+    return;
+  }
 
-  while (*p != '\0') {
-    if (*p == ' ') {    
-      empties++;
-    }
+  unsigned spaces = 0;
+  while (*p == ' ') {
+    spaces++;
     p++;
-    ssize++;
-  }
-  
-  for (int i = 0; i < ssize; i++) {
-    lineBuffer[i] = lineBuffer[i + empties];
   }
 
- 
+  char* aux = p;
+  unsigned i = 0;
+  while (*aux != '\0') {
+    lineBuffer[i] = lineBuffer[spaces + i];
+    i++;
+    aux++;
+  }
+
+  lineBuffer[i] = '\0';
 }
 
 /**
