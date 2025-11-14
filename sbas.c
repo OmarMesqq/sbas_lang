@@ -128,7 +128,7 @@ funcp sbasCompile(FILE* f) {
       continue;
     }
     trim_leading_spaces(lineBuffer);
-    
+
     if (lineBuffer[0] == ' ' || lineBuffer[0] == '\n') {
       printf("skipping line %d (spaces/newline):\n", line);
       line++;
@@ -297,8 +297,8 @@ funcp sbasCompile(FILE* f) {
   }
 
   #ifdef DEBUG
-  printf("sbasCompile parsed %d lines, writing %d bytes in buffer\n", line - 1, pos);
-  printf("%d lines were patched\n", relocCount);
+  printf("sbasCompile: processed %d lines, writing %d bytes in buffer\n", line - 1, pos);
+  printf("sbasCompile: %d lines were patched\n", relocCount);
   print_line_table(lt, line);
   print_relocation_table(rt, relocCount);
   #endif
@@ -322,9 +322,13 @@ void sbasCleanup(funcp sbasFunc) {
   munmap((void*) sbasFunc, MAX_CODE_SIZE);
 }
 
+/**
+ * Prints the entire string `s`, followed by a character-by-character
+ * dump of its contents (as character, decimal, and hex).
+ */
 static void dump_str(char* s) {
   printf("%s", s);
-  printf("Dumping string above...\n");
+  printf("dump_str: dumping string above...\n");
   char* p = s;
   while (*p != '\0') {
     printf("char: %c, %d (dec), %02x (hex)\n", *p, *p, *p);
@@ -333,26 +337,38 @@ static void dump_str(char* s) {
   printf("\n");
 }
 
+/**
+ * Trims leading spaces (' ')/ 32 (dec)/ 0x20 (hex),
+ * modifying `lineBuffer` in-place.
+ * Runs in O(n)
+ */
 static void trim_leading_spaces(char* lineBuffer) {
   char* p = lineBuffer;
+  // early return if string doesn't have leading whitespace
   if (*p != ' ') {
     return;
   }
 
+  // count spaces
   unsigned spaces = 0;
   while (*p == ' ') {
     spaces++;
     p++;
   }
 
-  char* aux = p;
+  char* aux = p;  // helper pointer with whitespace already consumed
   unsigned i = 0;
   while (*aux != '\0') {
+    #ifdef DEBUG
+    printf("trim_leading_spaces: setting lineBuffer[i = %d] (%c) to lineBuffer[spaces + i = %d] (%c)\n", i, lineBuffer[i], spaces + i, lineBuffer[spaces + i]);
+    #endif
+    // shifts the entire string to beginning, eliminating spaces
     lineBuffer[i] = lineBuffer[spaces + i];
     i++;
     aux++;
   }
 
+  // "discard" remaining bytes at end of string
   lineBuffer[i] = '\0';
 }
 
