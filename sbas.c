@@ -281,12 +281,6 @@ funcp sbasCompile(FILE* f) {
   print_relocation_table(rt, relocCount);
   #endif
 
-  free(lt);
-  free(rt);
-  // Avoid double free
-  lt = NULL;
-  rt = NULL;
-
   mprotectRes = make_buffer_executable(code, MAX_CODE_SIZE);
   if (mprotectRes == -1) {
     fprintf(stderr, "sbasCompile: failed to make_buffer_executable\n");
