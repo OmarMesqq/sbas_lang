@@ -11,8 +11,8 @@
 #define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
-#define MAX_LINES 50
-#define MAX_CODE_SIZE 1024
+#define MAX_LINES 50  // threshold for processing SBas file
+#define MAX_CODE_SIZE 1024  // maximum bytes the buffer holds
 
 /**
  * Maps each line in `.sbas` file to its offset in the machine code buffer
@@ -82,13 +82,13 @@ static void dump_str(char* s);
  */
 funcp sbasCompile(FILE* f) {
   unsigned line = 1;  // in .sbas file
-  char lineBuffer[256]; // will hold a line in .sbas file
+  char lineBuffer[256] = {0}; // will hold a line in .sbas file
   int pos = 0;         // byte position in the buffer
   int relocCount = 0;  // holds how many lines should have jump offsets written in the second pass
-  unsigned char* code;  // buffer to write SBas logic
-  int mprotectRes;      // holds status of syscall to make buffer executable
-  LineTable* lt;
-  RelocationTable* rt;
+  unsigned char* code = NULL;  // buffer to write SBas logic
+  int mprotectRes = 0;      // holds status of syscall to make buffer executable
+  LineTable* lt = NULL;
+  RelocationTable* rt = NULL;
 
   // Edge case handling: empty file
   fseek(f, 0, SEEK_END); // Seek to the end of the file
@@ -874,6 +874,11 @@ static int make_buffer_executable(void* ptr, size_t size) {
   return 0;
 }
 
+/**
+ * Dumps the `LineTable` corresponding to the currently compiled SBas file
+ * @param lt pointer to the `LineTable`
+ * @param lines amount of lines in the SBas file
+ */
 static void print_line_table(LineTable* lt, int lines) {
   printf("----- START LINE TABLE -----\n");
   printf("%-14s %s\n", "LINE", "START OFFSET (dec)");
@@ -884,6 +889,11 @@ static void print_line_table(LineTable* lt, int lines) {
   printf("----- END LINE TABLE -----\n");
 }
 
+/**
+ * Dumps the `RelocationTable` corresponding to the currently compiled SBas file
+ * @param rt pointer to the `RelocationTable`
+ * @param lines amount of lines in the SBas file
+ */
 static void print_relocation_table(RelocationTable* rt, int relocCount) {
   printf("----- START RELOCATION TABLE -----\n");
   printf("%-20s %s\n", "PATCH OFFSET (dec)", "TARGET LINE");
