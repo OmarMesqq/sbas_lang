@@ -122,8 +122,8 @@ funcp sbasCompile(FILE* f) {
    * First pass: emit most instructions and leave 4-byte placeholders for jumps
    */
   while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
-    // Skip comment lines, but still increase the parsed lines counter
     if (lineBuffer[0] == '/') {
+      printf("skipping line %d (comment):\n", line);
       line++;
       continue;
     }
