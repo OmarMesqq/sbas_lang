@@ -86,6 +86,7 @@ funcp sbasCompile(FILE* f) {
   int pos = 0;         // byte position in the buffer
   int relocCount = 0;  // holds how many lines should have jump offsets written in the second pass
   unsigned char* code = NULL;  // buffer to write SBas logic
+  funcp result_func = NULL;   // return result: `code` buffer casted to SBas function
   int mprotectRes = 0;      // holds status of syscall to make buffer executable
   LineTable* lt = NULL;
   RelocationTable* rt = NULL;
@@ -95,7 +96,7 @@ funcp sbasCompile(FILE* f) {
   long size = ftell(f); // Get the current file position: its size
   if (size == 0) {
     fprintf(stderr, "sbasCompile: the provided SBas file is empty.\n");
-    return NULL;
+    goto on_error;
   } else {
     rewind(f); // go back to file's start
   }
@@ -104,15 +105,13 @@ funcp sbasCompile(FILE* f) {
   rt = calloc((MAX_LINES + 1), sizeof(RelocationTable));
   if (!lt || !rt) {
     fprintf(stderr, "sbasCompile: failed to alloc line and/or relocation table!\n");
-    return NULL;
+    goto on_error;
   }
 
   code = alloc_writable_buffer(MAX_CODE_SIZE);
   if (!code) {
     fprintf(stderr, "sbasCompile: failed to alloc writable memory.\n");
-    free(lt);
-    free(rt);
-    return NULL;
+    goto on_error;
   }
 
   emit_prologue(code, &pos);
@@ -137,10 +136,7 @@ funcp sbasCompile(FILE* f) {
 
     if (line > MAX_LINES) {
       fprintf(stderr, "sbasCompile: the provided SBas file exceeds MAX_LINES (%d)!\n", MAX_LINES);
-      free(lt);
-      free(rt);
-      sbasCleanup((funcp) code);
-      return NULL;
+      goto on_error;
     }
 
     // printf("[line %d] lineBuffer is: %s\n", line, lineBuffer);
@@ -166,9 +162,7 @@ funcp sbasCompile(FILE* f) {
         // syntax error!
         else {
           error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
-          free(lt);
-          free(rt);
-          return NULL;
+          goto on_error;
         }
 
         break;
@@ -179,17 +173,13 @@ funcp sbasCompile(FILE* f) {
 
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
           error("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
-          free(lt);
-          free(rt);
-          return NULL;
+          goto on_error;
         }
 
         // Only 5 locals allowed for now (v1, v2, v3, v4, v5)
         if (idxVar < 1 || idxVar > 5) {
           error("sbasCompile: invalid local variable index: only 5 locals are allowed.", line);
-          free(lt);
-          free(rt);
-          return NULL;
+          goto on_error;
         }
 
         // attribution
@@ -198,9 +188,7 @@ funcp sbasCompile(FILE* f) {
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
             error("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
-            free(lt);
-            free(rt);
-            return NULL;
+            goto on_error;
           }
           emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
         }
@@ -215,16 +203,12 @@ funcp sbasCompile(FILE* f) {
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2) != 6) {
             error("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
-            free(lt);
-            free(rt);
-            return NULL;
+            goto on_error;
           }
 
           if (op != '+' && op != '-' && op != '*') {
             error("sbasCompile: invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
-            free(lt);
-            free(rt);
-            return NULL;
+            goto on_error;
           }
 
           emit_arithmetic_operation(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
@@ -237,9 +221,7 @@ funcp sbasCompile(FILE* f) {
         unsigned lineTarget;
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
           error("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
-          free(lt);
-          free(rt);
-          return NULL;
+          goto on_error;
         }
 
         emit_cmp_jump_instruction(code, &pos, varIndex);
@@ -259,9 +241,7 @@ funcp sbasCompile(FILE* f) {
       }
       default:
         error("sbasCompile: unknown SBas command", line);
-        free(lt);
-        free(rt);
-        return NULL;
+        goto on_error;
     }
     line++;
   }
@@ -272,9 +252,7 @@ funcp sbasCompile(FILE* f) {
   for (int i = 0; i < relocCount; i++) {
     if (lt[rt[i].lineTarget].line == 0) {
       error("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
-      free(lt);
-      free(rt);
-      return NULL;
+      goto on_error;
     }
 
     // get start of the line to jump to
@@ -305,14 +283,39 @@ funcp sbasCompile(FILE* f) {
 
   free(lt);
   free(rt);
+  // Avoid double free
+  lt = NULL;
+  rt = NULL;
 
   mprotectRes = make_buffer_executable(code, MAX_CODE_SIZE);
   if (mprotectRes == -1) {
     fprintf(stderr, "sbasCompile: failed to make_buffer_executable\n");
-    return NULL;
+    goto on_error;
   }
 
-  return (funcp)code;
+  result_func = (funcp)code;
+  goto on_cleanup;
+
+  /**
+   * This label is reached only on errors:
+   * Frees SBas buffer if defined, falls through auxiliary data structures `free`s
+   * and return result
+   */
+  on_error:
+    if (code) {
+      sbasCleanup((funcp)code);
+    }
+  /**
+   * This label is hit by both success and error paths:
+   * `free`s auxiliary data structures and falls through 
+   * return result
+   */
+  on_cleanup:
+    // It's safe to call free on NULL
+    free(lt);
+    free(rt);
+  
+  return result_func; // Returns the buffer with SBas code, `NULL` otherwise
 }
 
 /**
