@@ -95,7 +95,7 @@ funcp sbasCompile(FILE* f) {
   fseek(f, 0, SEEK_END); // Seek to the end of the file
   long size = ftell(f); // Get the current file position: its size
   if (size == 0) {
-    fprintf(stderr, "sbasCompile: the provided SBas file is empty.\n");
+    fprintf(stderr, "sbasCompile: the provided SBas file is empty. Aborting!\n");
     goto on_error;
   } else {
     rewind(f); // go back to file's start

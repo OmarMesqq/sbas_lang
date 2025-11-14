@@ -174,7 +174,7 @@ static void run_test_parse_full_grammar() {
     fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
-  printf("Testing if grammar is correctly parsed.\n");
+  printf("Testing if grammar is correctly parsed (everything.sbas).\n");
 
   sbasFunction = sbasCompile(sbasFile);
 
@@ -197,7 +197,7 @@ static void run_test_callee_saveds() {
     fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
-  printf("Testing if callee-saved registers are preserved...\n");
+  printf("Testing if callee-saved registers are preserved (assign_variables.sbas)...\n");
 
   sbasFunction = sbasCompile(sbasFile);
   assert(sbasFunction != NULL);
