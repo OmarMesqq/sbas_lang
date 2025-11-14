@@ -8,7 +8,7 @@
 #include <errno.h>
 
 // shows useful logs during SBas function compilation
-#define DEBUG
+// #define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 50  // threshold for processing SBas file
@@ -122,14 +122,18 @@ funcp sbasCompile(FILE* f) {
    */
   while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
     if (lineBuffer[0] == '/') {
-      printf("skipping line %d (comment):\n", line);
+      #ifdef DEBUG
+      printf("sbasCompile: skipping comment line%d.\n", line);
+      #endif
       line++;
       continue;
     }
     trim_leading_spaces(lineBuffer);
 
     if (lineBuffer[0] == ' ' || lineBuffer[0] == '\n') {
-      printf("skipping line %d (spaces/newline):\n", line);
+      #ifdef DEBUG
+      printf("sbasCompile: skipping spaces/newline line %d\n", line);
+      #endif
       line++;
       continue;
     }
@@ -139,9 +143,7 @@ funcp sbasCompile(FILE* f) {
       goto on_error;
     }
 
-    // printf("[line %d] lineBuffer is: %s\n", line, lineBuffer);
-    // printf("lineBuffer[0]: %c (str), %d (dec), %02x (hex)\n", lineBuffer[0], lineBuffer[0], lineBuffer[0]);
-    
+    // log the line in the table line
     lt[line].line = line;
     lt[line].offset = pos;
 

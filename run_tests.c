@@ -152,7 +152,7 @@ int main(void) {
   arg2 = 67;
   run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2, NULL, 0);
 
-  printf("Testing wrong syntax files...\n");
+  printf("Testing incorrect files...\n");
   run_failing_test("test_files/incorrect/wrong_return.sbas", "Bad return", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/empty.sbas", "Empty file", 0, NULL, NULL, NULL);
 
