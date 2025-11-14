@@ -162,7 +162,7 @@ int main(void) {
 
 /**
  * Compiles an SBas file containing all grammar. Expects to be successfully parsed.
- * The logic in this file doesn't make sense really, the only assertion is whether
+ * The logic in this file doesn't really make sense: the only assertion is whether
  * the compiler can correctly parse it.
  */
 static void run_test_parse_full_grammar() {
