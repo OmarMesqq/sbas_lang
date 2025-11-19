@@ -59,6 +59,7 @@ static void save_callee_saved_registers(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 static void emit_integer_in_hex(unsigned char code[], int* pos, int integer);
+static void emit_return(unsigned char code[], int* pos, char retType, int returnValue);
 static void emit_constant_literal_return(unsigned char code[], int* pos, int returnValue);
 static void emit_variable_return(unsigned char code[], int* pos, int varIdx);
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
@@ -155,12 +156,8 @@ funcp sbasCompile(FILE* f) {
         int varc;
         char retType; // 'v' for variable return, '$' for immediate value return
 
-        if (sscanf(lineBuffer, "ret %c%d", &retType, &varc) != 2) {
-          compilationError("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
-          goto on_error;
-        }
-
-        if (retType != 'v' && retType != '$') {
+        if (sscanf(lineBuffer, "ret %c%d", &retType, &varc) != 2
+          || (retType != 'v' && retType != '$')) {
           compilationError("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
           goto on_error;
         }
@@ -524,6 +521,11 @@ static void emit_integer_in_hex(unsigned char code[], int* pos, int integer) {
   (*pos)++;
   code[*pos] = (integer >> 24) & 0xFF;
   (*pos)++;
+}
+
+
+static void emit_return(unsigned char code[], int* pos, char retType, int returnValue) {
+
 }
 
 /**
