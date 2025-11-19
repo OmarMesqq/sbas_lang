@@ -154,6 +154,7 @@ int main(void) {
 
   printf("Testing incorrect files...\n");
   run_failing_test("test_files/incorrect/empty.sbas", "Empty file", 0, NULL, NULL, NULL);
+  //run_failing_test("test_files/incorrect/no_ret.sbas", "File without return", 0, NULL, NULL, NULL);
   //run_failing_test("test_files/incorrect/only_comments.sbas", "File with comments only", 0, NULL, NULL, NULL);
   //run_failing_test("test_files/incorrect/newlines_and_spaces.sbas", "File with whitespace only", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/over_maxlines.sbas", "File exceeding MAX_LINES", 0, NULL, NULL, NULL);
@@ -290,7 +291,7 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
 
   sbasFile = fopen(filePath, "r");
   if (!sbasFile) {
-    fprintf(stderr, RED "Could not open sbas file: %s.\n" RESET_COLOR, filePath);
+    fprintf(stderr, RED "run_test: could not open sbas file: %s.\n" RESET_COLOR, filePath);
     return;
   }
 
@@ -338,12 +339,13 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
  */
 static void run_failing_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3) {
   if (!filePath || !testName) {
-    fprintf(stderr, "run_test: filePath or testName were not passed.\n");
+    fprintf(stderr, "run_failing_test: filePath or testName were not passed.\n");
     return;
   }
+  printf("run_failing_test: testing file %s\n", filePath);
 
   if (paramCount < 0 || paramCount > 3) {
-    fprintf(stderr, "run_test: SBas functions have between 0 and 3 arguments.\n");
+    fprintf(stderr, "run_failing_test: SBas functions have between 0 and 3 arguments.\n");
     return;
   }
 
@@ -362,7 +364,7 @@ static void run_failing_test(const char* filePath, const char* testName, int par
 
   sbasFile = fopen(filePath, "r");
   if (!sbasFile) {
-    fprintf(stderr, RED "Could not open sbas file: %s.\n" RESET_COLOR, filePath);
+    fprintf(stderr, RED "run_failing_test: could not open sbas file: %s.\n" RESET_COLOR, filePath);
     return;
   }
 
