@@ -154,7 +154,7 @@ int main(void) {
 
   printf("Testing incorrect files...\n");
   run_failing_test("test_files/incorrect/empty.sbas", "Empty file", 0, NULL, NULL, NULL);
-  //run_failing_test("test_files/incorrect/no_ret.sbas", "File without return", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/no_ret.sbas", "File without return", 0, NULL, NULL, NULL);
   //run_failing_test("test_files/incorrect/only_comments.sbas", "File with comments only", 0, NULL, NULL, NULL);
   //run_failing_test("test_files/incorrect/newlines_and_spaces.sbas", "File with whitespace only", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/over_maxlines.sbas", "File exceeding MAX_LINES", 0, NULL, NULL, NULL);

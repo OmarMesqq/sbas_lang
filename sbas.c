@@ -266,6 +266,11 @@ funcp sbasCompile(FILE* f) {
     line++;
   }
 
+  if (!retFound) {
+    fprintf(stderr, "sbasCompile: SBas function doesn't include 'ret'. Aborting!\n");
+    goto on_error;
+  }
+
   /**
    * Second pass: fills 4-byte placeholder with offsets
    */
