@@ -147,7 +147,7 @@ funcp sbasCompile(FILE* f) {
       goto on_error;
     }
 
-    // log the line in the table line
+    // log the line in the line table
     lt[line].line = line;
     lt[line].offset = pos;
 
@@ -182,6 +182,12 @@ funcp sbasCompile(FILE* f) {
           compilationError(errorMsgBuffer, line);
           goto on_error;
         }
+        
+        if (operator != ':' && operator != '=') {
+          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
+          compilationError(errorMsgBuffer, line);
+          goto on_error;
+        }
 
         // attribution
         if (operator == ':') {
@@ -201,7 +207,7 @@ funcp sbasCompile(FILE* f) {
           char op;
           char varc2Prefix;
           int idxVarc2;
-          char remaining[128] = {0};  // used in scanset to detect extra operands/operators
+          char remaining[BUFFER_SIZE] = {0};  // used in scanset to detect extra operands/operators
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d %127[^\n]", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2, remaining) != 6) {
             compilationError("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
@@ -214,11 +220,6 @@ funcp sbasCompile(FILE* f) {
           }
 
           emit_arithmetic_operation(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
-        } else {
-          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
-          
-          compilationError(errorMsgBuffer, line);
-          goto on_error;
         }
 
         break;
@@ -226,6 +227,7 @@ funcp sbasCompile(FILE* f) {
       case 'i': { /* conditional jump */
         int varIndex;
         unsigned lineTarget;
+
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
           compilationError("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
           goto on_error;
