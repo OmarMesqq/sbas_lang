@@ -60,8 +60,6 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 static void emit_integer_in_hex(unsigned char code[], int* pos, int integer);
 static void emit_return(unsigned char code[], int* pos, char retType, int returnValue);
-static void emit_constant_literal_return(unsigned char code[], int* pos, int returnValue);
-static void emit_variable_return(unsigned char code[], int* pos, int varIdx);
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
 static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
 static void emit_cmp_jump_instruction(unsigned char code[], int* pos, int varIndex);
@@ -162,15 +160,7 @@ funcp sbasCompile(FILE* f) {
           goto on_error;
         }
 
-        // local variable return (ret vX)
-        if (retType == 'v') {
-          emit_variable_return(code, &pos, varc);
-        }
-
-        // constant literal return (ret $snum)
-        else if (retType == '$') {
-          emit_constant_literal_return(code, &pos, varc);
-        }
+        emit_return(code, &pos, retType, varc);
         retFound = 1;
 
         break;
@@ -525,36 +515,31 @@ static void emit_integer_in_hex(unsigned char code[], int* pos, int integer) {
 
 
 static void emit_return(unsigned char code[], int* pos, char retType, int returnValue) {
+  /**
+   * local variable return (ret vX):
+   * emits machine code for returning an SBas variable (v1 through v5)
+   */
+  if (retType == 'v') {
+    RegInfo reg = get_local_var_reg(returnValue);
+    if (reg.reg_code == -1) return;
 
-}
+    emit_rex_byte(code, pos, reg.rex, 0);
 
-/**
- * Emits machine code for returning an immediate value (movl $imm32, %eax)
- */
-static void emit_constant_literal_return(unsigned char code[], int* pos, int returnValue) {
-  code[*pos] = 0xb8;  // movl ..., %eax
-  (*pos)++;
+    emit_mov(code, pos);
 
-  emit_integer_in_hex(code, pos, returnValue);
+    // ModRM with `r/m` set to zero: target register is %eax
+    emit_modrm(code, pos, reg.reg_code, 0);
+  }
+  /**
+   * constant literal return (ret $snum):
+   * emits machine code for returning an immediate value (movl $imm32, %eax)
+   */
+  else if (retType == '$') {
+    code[*pos] = 0xb8;  // movl ..., %eax
+    (*pos)++;
 
-  restore_callee_saved_registers(code, pos);
-  emit_epilogue(code, pos);
-}
-
-/**
- * Emits machine code for returning an SBas variable (v1 through v5)
- */
-static void emit_variable_return(unsigned char code[], int* pos, int varIdx) {
-  RegInfo reg = get_local_var_reg(varIdx);
-  if (reg.reg_code == -1) return;
-
-  emit_rex_byte(code, pos, reg.rex, 0);
-
-  emit_mov(code, pos);
-
-  // ModRM with `r/m` set to zero: target register is %eax
-  emit_modrm(code, pos, reg.reg_code, 0);
-
+    emit_integer_in_hex(code, pos, returnValue);
+  }
   restore_callee_saved_registers(code, pos);
   emit_epilogue(code, pos);
 }
