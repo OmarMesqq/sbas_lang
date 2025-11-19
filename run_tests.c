@@ -181,12 +181,12 @@ static void run_test_parse_full_grammar() {
   FILE* sbasFile;
   funcp sbasFunction;
 
-  sbasFile = fopen("test_files/everything.sbas", "r");
+  sbasFile = fopen("test_files/whole_valid_grammar.sbas", "r");
   if (!sbasFile) {
     fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
-  printf("Testing if grammar is correctly parsed (everything.sbas).\n");
+  printf("Testing if grammar is correctly parsed (whole_valid_grammar.sbas).\n");
 
   sbasFunction = sbasCompile(sbasFile);
 
