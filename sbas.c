@@ -125,19 +125,13 @@ funcp sbasCompile(FILE* f) {
    * First pass: emit most instructions and leave 4-byte placeholders for jumps
    */
   while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
-    if (lineBuffer[0] == '/') {
-      #ifdef DEBUG
-      printf("sbasCompile: skipping comment line %d.\n", line);
-      #endif
-      line++;
-      continue;
-    }
     trim_leading_spaces(lineBuffer);
 
-    if (lineBuffer[0] == ' ' || lineBuffer[0] == '\n') {
-      #ifdef DEBUG
-      printf("sbasCompile: skipping spaces/newline line %d\n", line);
-      #endif
+    if (lineBuffer[0] == ' ' || 
+      lineBuffer[0] == '\n' || 
+      lineBuffer[0] == '\0' ||
+      lineBuffer[0] == '/'
+    ) {
       line++;
       continue;
     }
@@ -147,7 +141,6 @@ funcp sbasCompile(FILE* f) {
       goto on_error;
     }
 
-    // log the line in the line table
     lt[line].line = line;
     lt[line].offset = pos;
 

@@ -1,6 +1,8 @@
 #include "utils.h"
 #include <stdio.h>
 
+// #define DEBUG
+
 /**
  * Trims leading spaces (' ')/ 32 (dec)/ 0x20 (hex),
  * modifying `lineBuffer` in-place.
