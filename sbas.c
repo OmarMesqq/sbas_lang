@@ -123,7 +123,7 @@ funcp sbasCompile(FILE* f) {
   while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
     if (lineBuffer[0] == '/') {
       #ifdef DEBUG
-      printf("sbasCompile: skipping comment line%d.\n", line);
+      printf("sbasCompile: skipping comment line %d.\n", line);
       #endif
       line++;
       continue;
@@ -178,7 +178,7 @@ funcp sbasCompile(FILE* f) {
           goto on_error;
         }
 
-        // Only 5 locals allowed for now (v1, v2, v3, v4, v5)
+        // Only 5 locals are allowed (v1 through v5)
         if (idxVar < 1 || idxVar > 5) {
           error("sbasCompile: invalid local variable index: only 5 locals are allowed.", line);
           goto on_error;
