@@ -161,7 +161,7 @@ int main(void) {
   run_failing_test("test_files/incorrect/bad_att_operation.sbas", "Misformed attribution/arithmetic op.", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/exceeding_locals.sbas", "Using more than 5 locals", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/bad_attribution.sbas", "Bad attribution", 0, NULL, NULL, NULL);
-  //run_failing_test("test_files/incorrect/bad_arithmetic_op.sbas", "Bad arithmetic operation", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_arithmetic_op.sbas", "Bad arithmetic operation", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/unsupported_arithmetic_operation.sbas", "Unsupported arithmetic operation", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/bad_att_arithmetic_op_operator.sbas", "Bad arithmetic operator", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/bad_jump.sbas", "Bad jump (iflez)", 0, NULL, NULL, NULL);

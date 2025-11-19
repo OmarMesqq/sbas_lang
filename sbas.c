@@ -204,8 +204,9 @@ funcp sbasCompile(FILE* f) {
           char op;
           char varc2Prefix;
           int idxVarc2;
+          char remaining[128] = {0};  // used in scanset to detect extra operands/operators
 
-          if (sscanf(lineBuffer, "v%d = %c%d %c %c%d", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2) != 6) {
+          if (sscanf(lineBuffer, "v%d = %c%d %c %c%d %127[^\n]", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2, remaining) != 6) {
             error("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
             goto on_error;
           }
