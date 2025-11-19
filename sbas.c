@@ -53,7 +53,7 @@ typedef struct {
 } RegInfo;
 
 
-static void error(const char* msg, int line);
+static void compilationError(const char* msg, int line);
 static void emit_prologue(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
@@ -156,12 +156,12 @@ funcp sbasCompile(FILE* f) {
         char retType; // 'v' for variable return, '$' for immediate value return
 
         if (sscanf(lineBuffer, "ret %c%d", &retType, &varc) != 2) {
-          error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
+          compilationError("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
           goto on_error;
         }
 
         if (retType != 'v' && retType != '$') {
-          error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
+          compilationError("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
           goto on_error;
         }
 
@@ -183,7 +183,7 @@ funcp sbasCompile(FILE* f) {
         char operator;
 
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
-          error("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
+          compilationError("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
           goto on_error;
         }
 
@@ -191,7 +191,7 @@ funcp sbasCompile(FILE* f) {
         if (idxVar < 1 || idxVar > 5) {
           char errorMsgBuffer[256];
           snprintf(errorMsgBuffer, 256, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", idxVar);
-          error(errorMsgBuffer, line);
+          compilationError(errorMsgBuffer, line);
           goto on_error;
         }
 
@@ -200,7 +200,7 @@ funcp sbasCompile(FILE* f) {
           char varpcPrefix;
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
-            error("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
+            compilationError("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
             goto on_error;
           }
           emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
@@ -216,12 +216,12 @@ funcp sbasCompile(FILE* f) {
           char remaining[128] = {0};  // used in scanset to detect extra operands/operators
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d %127[^\n]", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2, remaining) != 6) {
-            error("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
+            compilationError("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
             goto on_error;
           }
 
           if (op != '+' && op != '-' && op != '*') {
-            error("sbasCompile: invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
+            compilationError("sbasCompile: invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
             goto on_error;
           }
 
@@ -230,7 +230,7 @@ funcp sbasCompile(FILE* f) {
           char errorMsgBuffer[256];
           snprintf(errorMsgBuffer, 256, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
           
-          error(errorMsgBuffer, line);
+          compilationError(errorMsgBuffer, line);
           goto on_error;
         }
 
@@ -240,7 +240,7 @@ funcp sbasCompile(FILE* f) {
         int varIndex;
         unsigned lineTarget;
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
-          error("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
+          compilationError("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
           goto on_error;
         }
 
@@ -260,7 +260,7 @@ funcp sbasCompile(FILE* f) {
         break;
       }
       default:
-        error("sbasCompile: unknown SBas command", line);
+        compilationError("sbasCompile: unknown SBas command", line);
         goto on_error;
     }
     line++;
@@ -276,7 +276,7 @@ funcp sbasCompile(FILE* f) {
    */
   for (int i = 0; i < relocCount; i++) {
     if (lt[rt[i].lineTarget].line == 0) {
-      error("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
+      compilationError("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
       goto on_error;
     }
 
@@ -347,7 +347,7 @@ void sbasCleanup(funcp sbasFunc) {
 /**
  * Prints a SBas compilation error `msg`, found at a given `line`, to `stderr`
  */
-static void error(const char* msg, int line) { 
+static void compilationError(const char* msg, int line) { 
   fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg, RESET_COLOR);
 }
 
