@@ -85,6 +85,9 @@ funcp sbasCompile(FILE* f) {
   char lineBuffer[256] = {0}; // will hold a line in .sbas file
   int pos = 0;         // byte position in the buffer
   int relocCount = 0;  // holds how many lines should have jump offsets written in the second pass
+
+  char retFound = 0;  // every SBas function MUST return
+
   unsigned char* code = NULL;  // buffer to write SBas logic
   funcp result_func = NULL;   // return result: `code` buffer casted to SBas function
   int mprotectRes = 0;      // holds status of syscall to make buffer executable
@@ -150,22 +153,28 @@ funcp sbasCompile(FILE* f) {
     switch (lineBuffer[0]) {
       case 'r': { /* return */
         int varc;
+        char retType; // 'v' for variable return, '$' for immediate value return
+
+        if (sscanf(lineBuffer, "ret %c%d", &retType, &varc) != 2) {
+          error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
+          goto on_error;
+        }
+
+        if (retType != 'v' && retType != '$') {
+          error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
+          goto on_error;
+        }
 
         // local variable return (ret vX)
-        if (sscanf(lineBuffer, "ret v%d", &varc) == 1) {
+        if (retType == 'v') {
           emit_variable_return(code, &pos, varc);
         }
 
         // constant literal return (ret $snum)
-        else if (sscanf(lineBuffer, "ret $%d", &varc) == 1) {
+        else if (retType == '$') {
           emit_constant_literal_return(code, &pos, varc);
         }
-
-        // syntax error!
-        else {
-          error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
-          goto on_error;
-        }
+        retFound = 1;
 
         break;
       }
