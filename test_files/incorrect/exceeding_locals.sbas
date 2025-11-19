@@ -1,0 +1,3 @@
+// use anything other than [1,5] in front of 'v' for local variable indexing
+v-1: $6
+ret v6
