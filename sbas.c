@@ -216,6 +216,12 @@ funcp sbasCompile(FILE* f) {
           }
 
           emit_arithmetic_operation(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
+        } else {
+          char errorMsgBuffer[256];
+          snprintf(errorMsgBuffer, 256, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
+          
+          error(errorMsgBuffer, line);
+          goto on_error;
         }
 
         break;
