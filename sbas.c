@@ -161,7 +161,7 @@ funcp sbasCompile(FILE* f) {
         }
 
         emit_return(code, &pos, retType, varc);
-        retFound = 1;
+        if (!retFound) retFound = 1;
 
         break;
       }
@@ -246,9 +246,10 @@ funcp sbasCompile(FILE* f) {
 
         break;
       }
-      default:
+      default: {
         compilationError("sbasCompile: unknown SBas command", line);
         goto on_error;
+      }
     }
     line++;
   }
