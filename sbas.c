@@ -9,7 +9,7 @@
 #include <errno.h>
 
 // shows useful logs during SBas function compilation
-// #define DEBUG
+#define DEBUG
 #define RED "\033[31m"
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 50  // threshold for processing SBas file
@@ -54,11 +54,10 @@ typedef struct {
 } RegInfo;
 
 
-static void compilationError(const char* msg, int line);
+
+// Assembly emission functions
 static void emit_prologue(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
-static void restore_callee_saved_registers(unsigned char code[], int* pos);
-static void emit_epilogue(unsigned char code[], int* pos);
 static void emit_integer_in_hex(unsigned char code[], int* pos, int integer);
 static void emit_return(unsigned char code[], int* pos, char retType, int returnValue);
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
@@ -68,10 +67,16 @@ static void emit_rex_byte(unsigned char code[], int* pos, char src_rex, char dst
 static void emit_modrm(unsigned char code[], int* pos, int src_reg_code, int dst_reg_code);
 static inline void emit_mov(unsigned char code[], int* pos);
 static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code, int integer);
+static void restore_callee_saved_registers(unsigned char code[], int* pos);
+static void emit_epilogue(unsigned char code[], int* pos);
+// Auxiliary assembler functions
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
+// JIT functions
 static void* alloc_writable_buffer(size_t size);
 static int make_buffer_executable(void* ptr, size_t size);
+// I/O functions
+static void compilation_error(const char* msg, int line);
 static void print_line_table(LineTable* lt, int lines);
 static void print_relocation_table(RelocationTable* rt, int relocCount);
 
@@ -151,7 +156,7 @@ funcp sbasCompile(FILE* f) {
 
         if (sscanf(lineBuffer, "ret %c%d", &retType, &varc) != 2
           || (retType != 'v' && retType != '$')) {
-          compilationError("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
+          compilation_error("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
           goto on_error;
         }
 
@@ -165,19 +170,19 @@ funcp sbasCompile(FILE* f) {
         char operator;
 
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
-          compilationError("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
+          compilation_error("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
           goto on_error;
         }
 
         if (idxVar < 1 || idxVar > 5) {
           snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", idxVar);
-          compilationError(errorMsgBuffer, line);
+          compilation_error(errorMsgBuffer, line);
           goto on_error;
         }
         
         if (operator != ':' && operator != '=') {
           snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
-          compilationError(errorMsgBuffer, line);
+          compilation_error(errorMsgBuffer, line);
           goto on_error;
         }
 
@@ -186,7 +191,7 @@ funcp sbasCompile(FILE* f) {
           char varpcPrefix;
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
-            compilationError("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
+            compilation_error("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
             goto on_error;
           }
           emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
@@ -202,13 +207,13 @@ funcp sbasCompile(FILE* f) {
           char remaining[BUFFER_SIZE] = {0};  // used in scanset to detect extra operands/operators
 
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d %127[^\n]", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2, remaining) != 6) {
-            compilationError("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
+            compilation_error("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
             goto on_error;
           }
 
           if (op != '+' && op != '-' && op != '*') {
             snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid arithmetic operation %c. Only addition (+), subtraction (-), and multiplication (*) allowed.", op);
-            compilationError(errorMsgBuffer, line);
+            compilation_error(errorMsgBuffer, line);
             goto on_error;
           }
 
@@ -222,7 +227,7 @@ funcp sbasCompile(FILE* f) {
         unsigned lineTarget;
 
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
-          compilationError("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
+          compilation_error("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
           goto on_error;
         }
 
@@ -242,7 +247,7 @@ funcp sbasCompile(FILE* f) {
         break;
       }
       default: {
-        compilationError("sbasCompile: unknown SBas command", line);
+        compilation_error("sbasCompile: unknown SBas command", line);
         goto on_error;
       }
     }
@@ -259,7 +264,7 @@ funcp sbasCompile(FILE* f) {
    */
   for (int i = 0; i < relocCount; i++) {
     if (lt[rt[i].lineTarget].line == 0) {
-      compilationError("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
+      compilation_error("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
       goto on_error;
     }
 
@@ -330,7 +335,7 @@ void sbasCleanup(funcp sbasFunc) {
 /**
  * Prints a SBas compilation error `msg`, found at a given `line`, to `stderr`
  */
-static void compilationError(const char* msg, int line) { 
+static void compilation_error(const char* msg, int line) { 
   fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg, RESET_COLOR);
 }
 
