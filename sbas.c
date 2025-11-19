@@ -180,7 +180,9 @@ funcp sbasCompile(FILE* f) {
 
         // Only 5 locals are allowed (v1 through v5)
         if (idxVar < 1 || idxVar > 5) {
-          error("sbasCompile: invalid local variable index: only 5 locals are allowed.", line);
+          char errorMsgBuffer[256];
+          snprintf(errorMsgBuffer, 256, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", idxVar);
+          error(errorMsgBuffer, line);
           goto on_error;
         }
 
