@@ -153,8 +153,19 @@ int main(void) {
   run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2, NULL, 0);
 
   printf("Testing incorrect files...\n");
-  run_failing_test("test_files/incorrect/wrong_return.sbas", "Bad return", 0, NULL, NULL, NULL);
   run_failing_test("test_files/incorrect/empty.sbas", "Empty file", 0, NULL, NULL, NULL);
+  //run_failing_test("test_files/incorrect/only_comments.sbas", "File with comments only", 0, NULL, NULL, NULL);
+  //run_failing_test("test_files/incorrect/newlines_and_spaces.sbas", "File with whitespace only", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/over_maxlines.sbas", "File exceeding MAX_LINES", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/wrong_return.sbas", "Bad return", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_att_operation.sbas", "Misformed attribution/arithmetic op.", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/exceeding_locals.sbas", "Using more than 5 locals", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_attribution.sbas", "Bad attribution", 0, NULL, NULL, NULL);
+  //run_failing_test("test_files/incorrect/bad_arithmetic_op.sbas", "Bad arithmetic operation", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/unsupported_arithmetic_operation.sbas", "Unsupported arithmetic operation", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_att_arithmetic_op_operator.sbas", "Bad arithmetic operator", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_jump.sbas", "Bad jump (iflez)", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/unknown_sbas_command.sbas", "Unknown SBas command", 0, NULL, NULL, NULL);
 
   printf(GREEN "All tests passed!\n" RESET_COLOR);
   return 0;
