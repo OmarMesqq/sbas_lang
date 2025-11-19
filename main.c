@@ -1,8 +1,7 @@
 #include <stdio.h>
 
 #include "sbas.h"
-
-static int stringToInt(char* str);
+#include "utils.h"
 
 int main(int argc, char* argv[]) {
     if (argc < 2 || argc > 5) {
@@ -57,37 +56,4 @@ int main(int argc, char* argv[]) {
     sbasCleanup(sbasFunction);
     fclose(fp);
     return 0;
-}
-
-/**
- * Converts the null-terminated string `str` to an integer.
- * Runs in O(n) - single pass.
- * Doesn't correctly handle broken inputs such as those with space, letters
- * and overflowing integers
- */
-static int stringToInt(char* str) {
-    int num = 0;
-    int digit = 0;
-    int isNegative = 0;
-
-    // is first char a minus sign?
-    if (*str == '-') {
-        isNegative = 1;
-        str++;
-    }
-
-    while(*str != '\0') {
-        // subtract the value of the digit char from 0 in ASCII table, getting its true value
-        digit = *str - '0';
-        // each new digit "adds" another power of 10 to the overall number
-        num *= 10;
-        num += digit; 
-        str++;
-    }
-
-    if (isNegative) {
-        num *= -1;
-    }
-    
-    return num;
 }

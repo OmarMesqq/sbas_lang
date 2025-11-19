@@ -1,4 +1,5 @@
 #include "sbas.h"
+#include "utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,8 +74,7 @@ static void* alloc_writable_buffer(size_t size);
 static int make_buffer_executable(void* ptr, size_t size);
 static void print_line_table(LineTable* lt, int lines);
 static void print_relocation_table(RelocationTable* rt, int relocCount);
-static void trim_leading_spaces(char* lineBuffer);
-static void dump_str(char* s);
+
 
 /**
  * Compiles a SBas function described in a .sbas file at
@@ -342,56 +342,6 @@ funcp sbasCompile(FILE* f) {
  */
 void sbasCleanup(funcp sbasFunc) {
   munmap((void*) sbasFunc, MAX_CODE_SIZE);
-}
-
-/**
- * Prints the entire string `s`, followed by a character-by-character
- * dump of its contents (as character, decimal, and hex).
- */
-static void dump_str(char* s) {
-  printf("%s", s);
-  printf("dump_str: dumping string above...\n");
-  char* p = s;
-  while (*p != '\0') {
-    printf("char: %c, %d (dec), %02x (hex)\n", *p, *p, *p);
-    p++;
-  }
-  printf("\n");
-}
-
-/**
- * Trims leading spaces (' ')/ 32 (dec)/ 0x20 (hex),
- * modifying `lineBuffer` in-place.
- * Runs in O(n)
- */
-static void trim_leading_spaces(char* lineBuffer) {
-  char* p = lineBuffer;
-  // early return if string doesn't have leading whitespace
-  if (*p != ' ') {
-    return;
-  }
-
-  // count spaces
-  unsigned spaces = 0;
-  while (*p == ' ') {
-    spaces++;
-    p++;
-  }
-
-  char* aux = p;  // helper pointer with whitespace already consumed
-  unsigned i = 0;
-  while (*aux != '\0') {
-    #ifdef DEBUG
-    printf("trim_leading_spaces: setting lineBuffer[i = %d] (%c) to lineBuffer[spaces + i = %d] (%c)\n", i, lineBuffer[i], spaces + i, lineBuffer[spaces + i]);
-    #endif
-    // shifts the entire string to beginning, eliminating spaces
-    lineBuffer[i] = lineBuffer[spaces + i];
-    i++;
-    aux++;
-  }
-
-  // "discard" remaining bytes at end of string
-  lineBuffer[i] = '\0';
 }
 
 /**
