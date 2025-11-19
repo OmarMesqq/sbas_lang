@@ -169,7 +169,6 @@ funcp sbasCompile(FILE* f) {
           goto on_error;
         }
 
-        // Only 5 locals are allowed (v1 through v5)
         if (idxVar < 1 || idxVar > 5) {
           snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", idxVar);
           compilationError(errorMsgBuffer, line);
@@ -208,7 +207,8 @@ funcp sbasCompile(FILE* f) {
           }
 
           if (op != '+' && op != '-' && op != '*') {
-            compilationError("sbasCompile: invalid arithmetic operation: only addition (+), subtraction (-), and multiplication (*) allowed.", line);
+            snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid arithmetic operation %c. Only addition (+), subtraction (-), and multiplication (*) allowed.", op);
+            compilationError(errorMsgBuffer, line);
             goto on_error;
           }
 
