@@ -14,6 +14,7 @@
 #define RESET_COLOR "\033[0m"
 #define MAX_LINES 50  // threshold for processing SBas file
 #define MAX_CODE_SIZE 1024  // maximum bytes the buffer holds
+#define BUFFER_SIZE 128     // length of a parsed line and of an error message
 
 /**
  * Maps each line in `.sbas` file to its offset in the machine code buffer
@@ -80,10 +81,11 @@ static void print_relocation_table(RelocationTable* rt, int relocCount);
  * the open `FILE*` handle `f`
  */
 funcp sbasCompile(FILE* f) {
-  unsigned line = 1;  // in .sbas file
-  char lineBuffer[256] = {0}; // will hold a line in .sbas file
+  unsigned line = 1;  // count in the SBas file
+  char lineBuffer[BUFFER_SIZE] = {0}; // a line in the SBas file
+  char errorMsgBuffer[BUFFER_SIZE] = {0};   // a compilation error message
   int pos = 0;         // byte position in the buffer
-  int relocCount = 0;  // holds how many lines should have jump offsets written in the second pass
+  int relocCount = 0;  // counts lines that should have jump offsets written in the second pass
 
   char retFound = 0;  // every SBas function MUST return
 
@@ -176,8 +178,7 @@ funcp sbasCompile(FILE* f) {
 
         // Only 5 locals are allowed (v1 through v5)
         if (idxVar < 1 || idxVar > 5) {
-          char errorMsgBuffer[256];
-          snprintf(errorMsgBuffer, 256, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", idxVar);
+          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", idxVar);
           compilationError(errorMsgBuffer, line);
           goto on_error;
         }
@@ -214,8 +215,7 @@ funcp sbasCompile(FILE* f) {
 
           emit_arithmetic_operation(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
         } else {
-          char errorMsgBuffer[256];
-          snprintf(errorMsgBuffer, 256, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
+          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
           
           compilationError(errorMsgBuffer, line);
           goto on_error;
