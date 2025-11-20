@@ -3,4 +3,7 @@
         ".gdbinit": "plaintext"
     },
     "C_Cpp.clang_format_fallbackStyle": "Google",
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false
 }
