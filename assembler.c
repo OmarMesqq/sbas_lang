@@ -17,8 +17,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
                                       int idxVar, char varc1Prefix,
                                       int idxVarc1, char op, char varc2Prefix,
                                       int idxVarc2);
-static void emit_cmp_jump_instruction(unsigned char code[], int* pos,
+static void emit_cmp(unsigned char code[], int* pos,
                                       int varIndex);
+static void emit_jle(unsigned char code[], int* pos);                                    
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
                           char dst_rex);
 static void emit_modrm(unsigned char code[], int* pos, int src_reg_code,
@@ -184,7 +185,8 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
           return -1;
         }
 
-        emit_cmp_jump_instruction(code, &pos, varIndex);
+        emit_cmp(code, &pos, varIndex);
+        emit_jle(code, &pos);
 
         // Mark current line to be resolved in patching step
         rt[*relocCount].lineTarget = lineTarget;
@@ -605,7 +607,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
  * cmpl $0, <variableRegister>
  * as well as the jle conditional jump opcode
  */
-static void emit_cmp_jump_instruction(unsigned char code[], int* pos,
+static void emit_cmp(unsigned char code[], int* pos,
                                       int varIndex) {
   RegInfo reg = get_local_var_reg(varIndex);
   if (reg.reg_code == -1) return;
@@ -616,10 +618,21 @@ static void emit_cmp_jump_instruction(unsigned char code[], int* pos,
   code[(*pos)++] = 0x83;
   code[(*pos)++] = 0xF8 + reg.reg_code;
   code[(*pos)++] = 0x00;
+}
 
-  // Emit jle
+/**
+ * Emits `jle rel32`
+ * which allows jumping to anywhere in code (+- 2GB)
+ */
+static void emit_jle(unsigned char code[], int* pos) {
+  // jle rel32 must be followed by 4 bytes of offset
   code[(*pos)++] = 0x0F;
   code[(*pos)++] = 0x8E;
+  
+  // TODO: optimization?
+  // short jumps such as those in tight loops only use 2 bytes:
+  // 0x7E + 1 byte offset
+  // https://www.felixcloutier.com/x86/jcc
 }
 
 /**
