@@ -2,12 +2,7 @@
 #define SBAS_H
 #include <stdio.h>
 
-/**
- * The SBas function:
- * Pointer to a function that takes `n` parameters (up to 3)
- * and returns a signed integer (32 bits)
- */
-typedef int (*funcp) ();
+#include "types.h"
 
 /**
  * Compiles a SBas function

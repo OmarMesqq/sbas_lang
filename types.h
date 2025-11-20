@@ -2,6 +2,14 @@
 #define TYPES_H
 
 /**
+ * The SBas function:
+ * Pointer to a function that takes `n` parameters (up to 3)
+ * and returns a signed integer (32 bits)
+ */
+typedef int (*funcp) ();
+
+
+/**
  * Maps each line in `.sbas` file to its offset in the machine code buffer
  *
  * Fields:
