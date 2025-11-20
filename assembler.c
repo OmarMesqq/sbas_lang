@@ -17,13 +17,12 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
                                       int idxVar, char varc1Prefix,
                                       int idxVarc1, char op, char varc2Prefix,
                                       int idxVarc2);
-static void emit_cmp(unsigned char code[], int* pos,
-                                      int varIndex);
+static void emit_cmp(unsigned char code[], int* pos, int varIndex);
 static void emit_jle(unsigned char code[], int* pos);                                    
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
                           char dst_rex);
-static void emit_modrm(unsigned char code[], int* pos, int src_reg_code,
-                       int dst_reg_code);
+static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
+                       int dest);
 static inline void emit_mov(unsigned char code[], int* pos);
 static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code,
                          int integer);
@@ -398,8 +397,10 @@ static void emit_return(unsigned char code[], int* pos, char retType,
 
     emit_mov(code, pos);
 
-    // ModRM with `r/m` set to zero: target register is %eax
-    emit_modrm(code, pos, reg.reg_code, 0);
+    // 11 in binary: reg to reg operation
+    int mode = 3;
+    // eax register id is 0
+    emit_modrm(code, pos, mode, reg.reg_code, 0);
   }
   /**
    * constant literal return (ret $snum):
@@ -429,7 +430,9 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
 
     emit_rex_byte(code, pos, src.rex, dst.rex);
     emit_mov(code, pos);
-    emit_modrm(code, pos, src.reg_code, dst.reg_code);
+    // 11 in binary: reg to reg operation
+    int mode = 3;
+    emit_modrm(code, pos, mode, src.reg_code, dst.reg_code);
   }
   // att var param
   else if (varpcPrefix == 'p') {
@@ -439,7 +442,9 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
 
     emit_rex_byte(code, pos, 0, dst.rex);
     emit_mov(code, pos);
-    emit_modrm(code, pos, src.reg_code, dst.reg_code);
+    // 11 in binary: reg to reg operation
+    int mode = 3;
+    emit_modrm(code, pos, mode, src.reg_code, dst.reg_code);
   }
   // att var imm
   else if (varpcPrefix == '$') {
@@ -484,7 +489,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
 
     emit_rex_byte(code, pos, src.rex, dst.rex);
     emit_mov(code, pos);
-    emit_modrm(code, pos, src.reg_code, dst.reg_code);
+    // 11 in binary: reg to reg operation
+    int mode = 3;
+    emit_modrm(code, pos, mode, src.reg_code, dst.reg_code);
 
   } else if (varc1Prefix == '$') {
     RegInfo dst = get_local_var_reg(idxVar);
@@ -541,7 +548,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
       dst.reg_code = src.reg_code;
       src.reg_code = temp;
     }
-    emit_modrm(code, pos, src.reg_code, dst.reg_code);
+    // 11 in binary: reg to reg operation
+    int mode = 3;
+    emit_modrm(code, pos, mode, src.reg_code, dst.reg_code);
 
   } else if (varc2Prefix == '$') {
     RegInfo dst = get_local_var_reg(idxVar);
@@ -607,8 +616,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
  * cmpl $0, <variableRegister>
  * as well as the jle conditional jump opcode
  */
-static void emit_cmp(unsigned char code[], int* pos,
-                                      int varIndex) {
+static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
   RegInfo reg = get_local_var_reg(varIndex);
   if (reg.reg_code == -1) return;
 
@@ -734,16 +742,17 @@ static inline void emit_mov(unsigned char code[], int* pos) {
 /**
  * The ModRM byte tells the CPU what are the operands involved in an operation.
  * It is built like this:
+ *
  * mod |  reg |  r/m
+ *
  * bb  | bbb  |  bbb
  *
- * The `mod` field is set to 11 which means the operation is between two
- * registers The 3 bit `reg` field maps to the SOURCE register of the operation
- * whereas the `r/m` field (also 3 bit wide) maps to the TARGET register
+ * @param mode 2 bits telling the instruction is between which parts
+ * @param source 3 bits mapping the source
+ * @param dest 3 bits mapping the destination
  */
-static void emit_modrm(unsigned char code[], int* pos, int src_reg_code,
-                       int dst_reg_code) {
-  code[(*pos)++] = 0xC0 + (src_reg_code << 3) + dst_reg_code;
+static void emit_modrm(unsigned char code[], int* pos, int mode, int source, int dest) {
+  code[(*pos)++] = (mode << 6) + (source << 3) + dest;
 }
 
 /**
