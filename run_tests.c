@@ -4,10 +4,7 @@
 #include <limits.h>
 
 #include "sbas.h"
-
-#define GREEN "\033[0;32m"
-#define RED "\033[31m"
-#define RESET_COLOR "\033[0m"
+#include "config.h"
 
 static void run_test_parse_full_grammar();
 static void run_test_callee_saveds();
