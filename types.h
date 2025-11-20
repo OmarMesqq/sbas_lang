@@ -47,4 +47,22 @@ typedef struct {
   char rex;
 } RegInfo;
 
+typedef struct {
+  unsigned int opcode;
+
+  unsigned char is_64bit;  // 1 or 0
+
+  unsigned char use_modrm;  // 1 or 0
+  unsigned char mod;        // 2 bits (0-3)
+  unsigned char reg;        // 4 bits (0-15)
+  unsigned char rm;         // 4 bits (0-15)
+
+  unsigned char use_disp;
+  int displacement;  // -8, -16, etc.
+
+  unsigned char use_imm;
+  int immediate;           // 10, 100, etc.
+  unsigned char imm_size;  // 1 or 4 bytes
+} Instruction;
+
 #endif
