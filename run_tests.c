@@ -1,15 +1,17 @@
 #include <assert.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h>
 
-#include "sbas.h"
 #include "config.h"
+#include "sbas.h"
 
 static void run_test_parse_full_grammar();
 static void run_test_callee_saveds();
-static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected);
-static void run_failing_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3);
+static void run_test(const char* filePath, const char* testName, int paramCount,
+                     int* p1, int* p2, int* p3, int expected);
+static void run_failing_test(const char* filePath, const char* testName,
+                             int paramCount, int* p1, int* p2, int* p3);
 
 int main(void) {
   int arg1, arg2, arg3;
@@ -17,50 +19,63 @@ int main(void) {
   run_test_parse_full_grammar();
   run_test_callee_saveds();
 
-  run_test("test_files/return_constant.sbas", "return constant literal", 0, NULL, NULL, NULL, 16909060);
-  
-  arg1 = -1253512;
-  run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL, NULL, -1253512);
-  
-  run_test("test_files/return_variable.sbas", "return variable", 0, NULL, NULL, NULL, 5);
+  run_test("test_files/return_constant.sbas", "return constant literal", 0,
+           NULL, NULL, NULL, 16909060);
 
-  run_test("test_files/assign_constant.sbas", "constant attributions", 0, NULL, NULL, NULL, -1004);
+  arg1 = -1253512;
+  run_test("test_files/return_param.sbas", "return parameter", 1, &arg1, NULL,
+           NULL, -1253512);
+
+  run_test("test_files/return_variable.sbas", "return variable", 0, NULL, NULL,
+           NULL, 5);
+
+  run_test("test_files/assign_constant.sbas", "constant attributions", 0, NULL,
+           NULL, NULL, -1004);
 
   arg1 = 255;
   arg2 = 0;
   arg3 = 327;
-  run_test("test_files/assign_parameters.sbas", "parameter attributions", 3, &arg1, &arg2, &arg3, 255);
+  run_test("test_files/assign_parameters.sbas", "parameter attributions", 3,
+           &arg1, &arg2, &arg3, 255);
 
-  run_test("test_files/all_arithmetic_cases.sbas", "all arithmetic operations", 0, NULL, NULL, NULL, -746);
-  
+  run_test("test_files/all_arithmetic_cases.sbas", "all arithmetic operations",
+           0, NULL, NULL, NULL, -746);
 
   /**
    * f(x) = x + 1 tests
    */
   arg1 = 0;
-  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL,
+           NULL, arg1 + 1);
   arg1 = -1;
-  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL,
+           NULL, arg1 + 1);
   arg1 = 1;
-  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, arg1 + 1);
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL,
+           NULL, arg1 + 1);
   arg1 = INT_MAX;
-  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL, NULL, INT_MIN);
+  run_test("test_files/add_one_to_arg.sbas", "f(x) = x + 1", 1, &arg1, NULL,
+           NULL, INT_MIN);
 
   arg1 = 3;
-  run_test("test_files/arithmetic_operation.sbas", "some arithmetic operations", 1, &arg1, NULL, NULL, 2520);
-  
+  run_test("test_files/arithmetic_operation.sbas", "some arithmetic operations",
+           1, &arg1, NULL, NULL, 2520);
+
   /**
    * a^2 - b^2 tests
    */
   arg1 = 7;
   arg2 = 7;
-  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 0);
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2,
+           &arg1, &arg2, NULL, 0);
   arg1 = 10;
   arg2 = 1;
-  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, 99);
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2,
+           &arg1, &arg2, NULL, 99);
   arg1 = 0;
   arg2 = 3;
-  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2, &arg1, &arg2, NULL, -9);
+  run_test("test_files/difference_of_squares.sbas", "difference of squares", 2,
+           &arg1, &arg2, NULL, -9);
 
   /**
    * Factorial tests
@@ -70,7 +85,8 @@ int main(void) {
   arg1 = 1;
   run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 1);
   arg1 = 10;
-  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL, 3628800);
+  run_test("test_files/factorial.sbas", "factorial", 1, &arg1, NULL, NULL,
+           3628800);
 
   /**
    * x + 1 > 0 tests
@@ -83,39 +99,47 @@ int main(void) {
   run_test("test_files/is_negative.sbas", "x + 1 > 0", 1, &arg1, NULL, NULL, 1);
   arg1 = 1;
   run_test("test_files/is_negative.sbas", "x + 1 > 0", 1, &arg1, NULL, NULL, 0);
-  
+
   arg1 = 1;
-  run_test("test_files/dead_code.sbas", "Dead code", 1, &arg1, NULL, NULL, -775);
+  run_test("test_files/dead_code.sbas", "Dead code", 1, &arg1, NULL, NULL,
+           -775);
 
   /**
    * Multiple branches tests
    */
   arg1 = 0;
-  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 2);
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1,
+           NULL, NULL, 2);
   arg1 = -1;
-  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 2);
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1,
+           NULL, NULL, 2);
   arg1 = INT_MIN;
-  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 2);
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1,
+           NULL, NULL, 2);
   arg1 = 1;
-  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 3);
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1,
+           NULL, NULL, 3);
   arg1 = INT_MAX;
-  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1, NULL, NULL, 1);
+  run_test("test_files/multiple_branches.sbas", "Multiple branches", 1, &arg1,
+           NULL, NULL, 1);
 
   /**
    * Chained ifs tests
    */
   arg1 = -2;
-  run_test("test_files/chained_ifs.sbas", "Chained conditionals", 1, &arg1, NULL, NULL, 42);
+  run_test("test_files/chained_ifs.sbas", "Chained conditionals", 1, &arg1,
+           NULL, NULL, 42);
   arg1 = 1;
-  run_test("test_files/chained_ifs.sbas", "Chained conditionals", 1, &arg1, NULL, NULL, 99);
-  
+  run_test("test_files/chained_ifs.sbas", "Chained conditionals", 1, &arg1,
+           NULL, NULL, 99);
+
   /**
    * Two parameters
    */
   arg1 = 4;
   arg2 = 5;
-  run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2, NULL, 68894720);
-  
+  run_test("test_files/two_arguments.sbas", "2 parameters", 2, &arg1, &arg2,
+           NULL, 68894720);
 
   /**
    * Three parameters
@@ -123,56 +147,75 @@ int main(void) {
   arg1 = 1;
   arg2 = 0;
   arg3 = -2000;
-  run_test("test_files/three_arguments.sbas", "3 parameters", 3, &arg1, &arg2, &arg3, 256);
+  run_test("test_files/three_arguments.sbas", "3 parameters", 3, &arg1, &arg2,
+           &arg3, 256);
   arg1 = -1;
-  run_test("test_files/three_arguments.sbas", "3 parameters", 3, &arg1, &arg2, &arg3, -444);
-
+  run_test("test_files/three_arguments.sbas", "3 parameters", 3, &arg1, &arg2,
+           &arg3, -444);
 
   /**
    * Multiply param by 10
    */
   arg1 = -1;
-  run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1, &arg1, NULL, NULL, -10);
-  
+  run_test("test_files/multiply_param_by_10.sbas", "Multiply param by 10", 1,
+           &arg1, NULL, NULL, -10);
+
   /**
    * Three parameter multiplication
    */
   arg1 = 1;
   arg2 = 1;
   arg3 = 1;
-  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3, &arg1, &arg2, &arg3, -100);
+  run_test("test_files/multiplication.sbas", "3 parameter multiplication", 3,
+           &arg1, &arg2, &arg3, -100);
 
   arg1 = 1;
-  run_test("test_files/subtraction_1.sbas", "Subtraction 1", 1, &arg1, NULL, NULL, 0);
+  run_test("test_files/subtraction_1.sbas", "Subtraction 1", 1, &arg1, NULL,
+           NULL, 0);
 
   arg1 = 99;
   arg2 = 67;
-  run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2, NULL, 0);
+  run_test("test_files/subtraction_2.sbas", "Subtraction 2", 2, &arg1, &arg2,
+           NULL, 0);
 
   printf("Testing incorrect files...\n");
-  run_failing_test("test_files/incorrect/empty.sbas", "Empty file", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/no_ret.sbas", "File without return", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/only_comments.sbas", "File with comments only", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/newlines_and_spaces.sbas", "File with whitespace only", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/over_maxlines.sbas", "File exceeding MAX_LINES", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/wrong_return.sbas", "Bad return", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/bad_att_operation.sbas", "Misformed attribution/arithmetic op.", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/exceeding_locals.sbas", "Using more than 5 locals", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/bad_attribution.sbas", "Bad attribution", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/bad_arithmetic_op.sbas", "Bad arithmetic operation", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/unsupported_arithmetic_operation.sbas", "Unsupported arithmetic operation", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/bad_att_arithmetic_op_operator.sbas", "Bad arithmetic operator", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/bad_jump.sbas", "Bad jump (iflez)", 0, NULL, NULL, NULL);
-  run_failing_test("test_files/incorrect/unknown_sbas_command.sbas", "Unknown SBas command", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/empty.sbas", "Empty file", 0, NULL,
+                   NULL, NULL);
+  run_failing_test("test_files/incorrect/no_ret.sbas", "File without return", 0,
+                   NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/only_comments.sbas",
+                   "File with comments only", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/newlines_and_spaces.sbas",
+                   "File with whitespace only", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/over_maxlines.sbas",
+                   "File exceeding MAX_LINES", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/wrong_return.sbas", "Bad return", 0,
+                   NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_att_operation.sbas",
+                   "Misformed attribution/arithmetic op.", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/exceeding_locals.sbas",
+                   "Using more than 5 locals", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_attribution.sbas",
+                   "Bad attribution", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_arithmetic_op.sbas",
+                   "Bad arithmetic operation", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/unsupported_arithmetic_operation.sbas",
+                   "Unsupported arithmetic operation", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_att_arithmetic_op_operator.sbas",
+                   "Bad arithmetic operator", 0, NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/bad_jump.sbas", "Bad jump (iflez)", 0,
+                   NULL, NULL, NULL);
+  run_failing_test("test_files/incorrect/unknown_sbas_command.sbas",
+                   "Unknown SBas command", 0, NULL, NULL, NULL);
 
   printf(GREEN "All tests passed!\n" RESET_COLOR);
   return 0;
 }
 
 /**
- * Compiles an SBas file containing all grammar. Expects to be successfully parsed.
- * The logic in this file doesn't really make sense: the only assertion is whether
- * the compiler can correctly parse it.
+ * Compiles an SBas file containing all grammar. Expects to be successfully
+ * parsed. The logic in this file doesn't really make sense: the only assertion
+ * is whether the compiler can correctly parse it.
  */
 static void run_test_parse_full_grammar() {
   FILE* sbasFile;
@@ -183,7 +226,8 @@ static void run_test_parse_full_grammar() {
     fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
-  printf("Testing if grammar is correctly parsed (whole_valid_grammar.sbas).\n");
+  printf(
+      "Testing if grammar is correctly parsed (whole_valid_grammar.sbas).\n");
 
   sbasFunction = sbasCompile(sbasFile);
 
@@ -206,7 +250,9 @@ static void run_test_callee_saveds() {
     fprintf(stderr, RED "Could not open .sbas file!\n" RESET_COLOR);
     return;
   }
-  printf("Testing if callee-saved registers are preserved (assign_variables.sbas)...\n");
+  printf(
+      "Testing if callee-saved registers are preserved "
+      "(assign_variables.sbas)...\n");
 
   sbasFunction = sbasCompile(sbasFile);
   assert(sbasFunction != NULL);
@@ -225,10 +271,10 @@ static void run_test_callee_saveds() {
       "mov %[val_r14], %%r14\n\t"
       "mov %[val_r15], %%r15\n\t"
       :
-      : [val_rbx] "r"(rbx), [val_r12] "r"(r12), [val_r13] "r"(r13), [val_r14] "r"(r14), [val_r15] "r"(r15)
+      : [val_rbx] "r"(rbx), [val_r12] "r"(r12), [val_r13] "r"(r13),
+        [val_r14] "r"(r14), [val_r15] "r"(r15)
       : "rbx", "r12", "r13", "r14", "r15");
 
-  
   (*sbasFunction)();
 
   // After function is called, load the register values in variables
@@ -239,7 +285,9 @@ static void run_test_callee_saveds() {
       "mov %%r13, %[out_r13]\n\t"
       "mov %%r14, %[out_r14]\n\t"
       "mov %%r15, %[out_r15]\n\t"
-      : [out_b] "=r"(rbx_after), [out_r12] "=r"(r12_after), [out_r13] "=r"(r13_after), [out_r14] "=r"(r14_after), [out_r15] "=r"(r15_after));
+      : [out_b] "=r"(rbx_after), [out_r12] "=r"(r12_after),
+        [out_r13] "=r"(r13_after), [out_r14] "=r"(r14_after),
+        [out_r15] "=r"(r15_after));
 
   assert(rbx_after == rbx && "rbx was altered and not restored!");
   assert(r12_after == r12 && "r12 was altered and not restored!");
@@ -261,26 +309,28 @@ static void run_test_callee_saveds() {
  * @param p3 pointer to the third parameter of SBas function
  * @param expected value to assert on SBas function return
  */
-static void run_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3, int expected) {
+static void run_test(const char* filePath, const char* testName, int paramCount,
+                     int* p1, int* p2, int* p3, int expected) {
   if (!filePath || !testName) {
     fprintf(stderr, "run_test: filePath or testName were not passed.\n");
     return;
   }
 
   if (paramCount < 0 || paramCount > 3) {
-    fprintf(stderr, "run_test: SBas functions have between 0 and 3 arguments.\n");
+    fprintf(stderr,
+            "run_test: SBas functions have between 0 and 3 arguments.\n");
     return;
   }
 
   if ((paramCount == 1) && p1 == NULL) {
     return;
-  } 
+  }
   if ((paramCount == 2) && ((p1 == NULL) || (p2 == NULL))) {
     return;
-  } if ((paramCount == 3) && ((p1 == NULL) || (p2 == NULL) || (p3 == NULL))) {
+  }
+  if ((paramCount == 3) && ((p1 == NULL) || (p2 == NULL) || (p3 == NULL))) {
     return;
   }
-
 
   FILE* sbasFile;
   funcp sbasFunction;
@@ -288,7 +338,8 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
 
   sbasFile = fopen(filePath, "r");
   if (!sbasFile) {
-    fprintf(stderr, RED "run_test: could not open sbas file: %s.\n" RESET_COLOR, filePath);
+    fprintf(stderr, RED "run_test: could not open sbas file: %s.\n" RESET_COLOR,
+            filePath);
     return;
   }
 
@@ -297,30 +348,38 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
 
   switch (paramCount) {
     case 0:
-      printf("Running test %s for file %s with no params\n", testName, filePath);
+      printf("Running test %s for file %s with no params\n", testName,
+             filePath);
       res = (*sbasFunction)();
       break;
     case 1:
-      printf("Running test %s for file %s with one param: p1 = %d\n", testName, filePath, *p1);
+      printf("Running test %s for file %s with one param: p1 = %d\n", testName,
+             filePath, *p1);
       res = sbasFunction(*p1);
       break;
     case 2:
-      printf("Running test %s for file %s with two params: p1 = %d, p2 = %d\n", testName, filePath, *p1, *p2);
+      printf("Running test %s for file %s with two params: p1 = %d, p2 = %d\n",
+             testName, filePath, *p1, *p2);
       res = sbasFunction(*p1, *p2);
       break;
     case 3:
-      printf("Running test %s for file %s with three params: p1 = %d, p2 = %d, p3 = %d\n", testName, filePath, *p1, *p2, *p3);
+      printf(
+          "Running test %s for file %s with three params: p1 = %d, p2 = %d, p3 "
+          "= %d\n",
+          testName, filePath, *p1, *p2, *p3);
       res = sbasFunction(*p1, *p2, *p3);
       break;
     default:
-      fprintf(stderr, RED "run_tests: invalid paramCount: %d" RESET_COLOR, paramCount);
+      fprintf(stderr, RED "run_tests: invalid paramCount: %d" RESET_COLOR,
+              paramCount);
       break;
   }
 
   fclose(sbasFile);
   sbasCleanup(sbasFunction);
   if (res != expected) {
-    fprintf(stderr, RED "Test %s FAILED! Expected: %d, got: %d\n" RESET_COLOR, testName, expected, res);
+    fprintf(stderr, RED "Test %s FAILED! Expected: %d, got: %d\n" RESET_COLOR,
+            testName, expected, res);
     exit(-1);
   }
 }
@@ -334,34 +393,40 @@ static void run_test(const char* filePath, const char* testName, int paramCount,
  * @param p2 pointer to the second parameter of SBas function
  * @param p3 pointer to the third parameter of SBas function
  */
-static void run_failing_test(const char* filePath, const char* testName, int paramCount, int* p1, int* p2, int* p3) {
+static void run_failing_test(const char* filePath, const char* testName,
+                             int paramCount, int* p1, int* p2, int* p3) {
   if (!filePath || !testName) {
-    fprintf(stderr, "run_failing_test: filePath or testName were not passed.\n");
+    fprintf(stderr,
+            "run_failing_test: filePath or testName were not passed.\n");
     return;
   }
   printf("run_failing_test: testing file %s\n", filePath);
 
   if (paramCount < 0 || paramCount > 3) {
-    fprintf(stderr, "run_failing_test: SBas functions have between 0 and 3 arguments.\n");
+    fprintf(
+        stderr,
+        "run_failing_test: SBas functions have between 0 and 3 arguments.\n");
     return;
   }
 
   if ((paramCount == 1) && p1 == NULL) {
     return;
-  } 
+  }
   if ((paramCount == 2) && ((p1 == NULL) || (p2 == NULL))) {
     return;
-  } if ((paramCount == 3) && ((p1 == NULL) || (p2 == NULL) || (p3 == NULL))) {
+  }
+  if ((paramCount == 3) && ((p1 == NULL) || (p2 == NULL) || (p3 == NULL))) {
     return;
   }
-
 
   FILE* sbasFile;
   funcp sbasFunction;
 
   sbasFile = fopen(filePath, "r");
   if (!sbasFile) {
-    fprintf(stderr, RED "run_failing_test: could not open sbas file: %s.\n" RESET_COLOR, filePath);
+    fprintf(stderr,
+            RED "run_failing_test: could not open sbas file: %s.\n" RESET_COLOR,
+            filePath);
     return;
   }
 

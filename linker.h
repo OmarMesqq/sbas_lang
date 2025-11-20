@@ -3,6 +3,7 @@
 
 #include "types.h"
 
-char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relocCount);
+char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt,
+              int* relocCount);
 
 #endif

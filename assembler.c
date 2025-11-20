@@ -32,17 +32,16 @@ static void emit_epilogue(unsigned char code[], int* pos);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 
-
 /**
  * Receives an **open** file handle of the SBas file and
  * attempts to write corresponding logic in x86-64 machine code to a buffer
- * 
+ *
  * @param code writable buffer
  * @param f **open** file handle to SBas file
  * @param lt pointer to a line table struct
- * @param rt pointer to a relocation table struct 
+ * @param rt pointer to a relocation table struct
  * @param relocCount pointer to a counter for tracking lines with jumps
- * 
+ *
  * @returns 0 on success, -1 on failure
  */
 char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,

@@ -18,7 +18,7 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt,
   for (int i = 0; i < *relocCount; i++) {
     if (lt[rt[i].lineTarget].line == 0) {
       compilationError("sbasCompile: jump target is not an executable line",
-                        rt[i].lineTarget);
+                       rt[i].lineTarget);
       return -1;
     }
 
