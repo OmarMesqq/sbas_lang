@@ -7,6 +7,7 @@
 
 #define BUFFER_SIZE 128  // length of a parsed line and of an error message
 
+static void emit_instruction(unsigned char code[], int* pos, Instruction* inst);
 static void emit_prologue(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_return(unsigned char code[], int* pos, char retType,
@@ -18,7 +19,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
                                       int idxVarc1, char op, char varc2Prefix,
                                       int idxVarc2);
 static void emit_cmp(unsigned char code[], int* pos, int varIndex);
-static void emit_jle(unsigned char code[], int* pos);                                    
+static void emit_jle(unsigned char code[], int* pos);
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
                           char dst_rex);
 static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
@@ -254,120 +255,92 @@ static void emit_prologue(unsigned char code[], int* pos) {
  * is aligned at a 16-byte boundary (another ABI requirement)
  */
 static void save_callee_saved_registers(unsigned char code[], int* pos) {
-  // subq $48, %rsp
-  code[*pos] = 0x48;
-  (*pos)++;
-  code[*pos] = 0x83;
-  (*pos)++;
-  code[*pos] = 0xEC;
-  (*pos)++;
-  code[*pos] = 0x30;
-  (*pos)++;
+  // adjust stack pointer: subq $48, %rsp
+  Instruction sub = {0};
+  sub.opcode = 0x83;     // 0x83 = Arithmetic with byte immediate
+  sub.is_64bit = 1;      
+  sub.use_modrm = 1;     
+  sub.mod = 3;           // 11 = Register Direct Mode
+  sub.reg = 5;           // 5 = Opcode Extension for SUB
+  sub.rm = 4;            // 4 = RSP Register ID
+  sub.use_imm = 1;
+  sub.imm_size = 1;      // 1 byte immediate
+  sub.immediate = 48;    // Value 48
+  emit_instruction(code, pos, &sub);
 
-  // movq %rbx, -8(%rbp)
-  code[*pos] = 0x48;
-  (*pos)++;
-  code[*pos] = 0x89;
-  (*pos)++;
-  code[*pos] = 0x5D;
-  (*pos)++;
-  code[*pos] = 0xF8;
-  (*pos)++;
+  // 2. Save Registers to Stack
+  // Create a template for "MOV Reg to Memory[RBP + Offset]"
+  Instruction mov = {0};
+  mov.opcode = 0x89;     // MOV r/m64, r64
+  mov.is_64bit = 1;      // REX.W
+  mov.use_modrm = 1;
+  mov.mod = 1;           // 01 = Memory + Byte Displacement
+  mov.rm = 5;            // Destination Base is RBP (ID 5)
+  mov.use_disp = 1;      // We are using a displacement
 
-  // movq %r12, -16(%rbp)
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x89;
-  (*pos)++;
-  code[*pos] = 0x65;
-  (*pos)++;
-  code[*pos] = 0xF0;
-  (*pos)++;
+  // Save RBX at -8: movq %rbx, -8(%rbp)
+  mov.reg = 3;           // Source Register
+  mov.displacement = -8;
+  emit_instruction(code, pos, &mov);
 
-  // movq %r13, -24(%rbp)
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x89;
-  (*pos)++;
-  code[*pos] = 0x6D;
-  (*pos)++;
-  code[*pos] = 0xE8;
-  (*pos)++;
+  // Save R12 at -16: movq %r12, -16(%rbp)
+  mov.reg = 12;           
+  mov.displacement = -16;
+  emit_instruction(code, pos, &mov);
 
-  // movq %r14, -32(%rbp)
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x89;
-  (*pos)++;
-  code[*pos] = 0x75;
-  (*pos)++;
-  code[*pos] = 0xE0;
-  (*pos)++;
+  // Save R13 at -24: movq %r13, -24(%rbp)
+  mov.reg = 13;
+  mov.displacement = -24;
+  emit_instruction(code, pos, &mov);
 
-  // movq %r15, -40(%rbp)
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x89;
-  (*pos)++;
-  code[*pos] = 0x7D;
-  (*pos)++;
-  code[*pos] = 0xD8;
-  (*pos)++;
+  // Save R14 at -32: movq %r14, -32(%rbp)
+  mov.reg = 14;
+  mov.displacement = -32;
+  emit_instruction(code, pos, &mov);
+
+  // Save R15 at -40: movq %r15, -40(%rbp)
+  mov.reg = 15;
+  mov.displacement = -40;
+  emit_instruction(code, pos, &mov);
 }
 
 /**
  * Restores callee-saved registers values stored in the stack frame
  */
 static void restore_callee_saved_registers(unsigned char code[], int* pos) {
-  // movq -8(%rbp), %rbx
-  code[*pos] = 0x48;
-  (*pos)++;
-  code[*pos] = 0x8B;
-  (*pos)++;
-  code[*pos] = 0x5D;
-  (*pos)++;
-  code[*pos] = 0xF8;
-  (*pos)++;
+  // Create a template for "MOV Memory[RBP + Offset] to Reg"
+  Instruction mov = {0};
+  mov.opcode = 0x8B;     // 0x8B = "Move FROM Memory TO Register" 
+  mov.is_64bit = 1;      // REX.W
+  mov.use_modrm = 1;
+  mov.mod = 1;           // 01 = Memory + Byte Displacement
+  mov.rm = 5;            // Source Base is RBP (ID 5)
+  mov.use_disp = 1;      // We are using a displacement
 
-  // movq -16(%rbp), %r12
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x8B;
-  (*pos)++;
-  code[*pos] = 0x65;
-  (*pos)++;
-  code[*pos] = 0xF0;
-  (*pos)++;
+  // Restore RBX (ID 3) from -8
+  mov.reg = 3;           // Destination Register
+  mov.displacement = -8;
+  emit_instruction(code, pos, &mov);
 
-  // movq -24(%rbp), %r13
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x8B;
-  (*pos)++;
-  code[*pos] = 0x6D;
-  (*pos)++;
-  code[*pos] = 0xE8;
-  (*pos)++;
+  // Restore R12 (ID 12) from -16
+  mov.reg = 12;          
+  mov.displacement = -16;
+  emit_instruction(code, pos, &mov);
 
-  // movq -32(%rbp), %r14
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x8B;
-  (*pos)++;
-  code[*pos] = 0x75;
-  (*pos)++;
-  code[*pos] = 0xE0;
-  (*pos)++;
+  // Restore R13 (ID 13) from -24
+  mov.reg = 13;
+  mov.displacement = -24;
+  emit_instruction(code, pos, &mov);
 
-  // movq -40(%rbp), %r15
-  code[*pos] = 0x4C;
-  (*pos)++;
-  code[*pos] = 0x8B;
-  (*pos)++;
-  code[*pos] = 0x7D;
-  (*pos)++;
-  code[*pos] = 0xD8;
-  (*pos)++;
+  // Restore R14 (ID 14) from -32
+  mov.reg = 14;
+  mov.displacement = -32;
+  emit_instruction(code, pos, &mov);
+
+  // Restore R15 (ID 15) from -40
+  mov.reg = 15;
+  mov.displacement = -40;
+  emit_instruction(code, pos, &mov);
 }
 
 /**
@@ -636,7 +609,7 @@ static void emit_jle(unsigned char code[], int* pos) {
   // jle rel32 must be followed by 4 bytes of offset
   code[(*pos)++] = 0x0F;
   code[(*pos)++] = 0x8E;
-  
+
   // TODO: optimization?
   // short jumps such as those in tight loops only use 2 bytes:
   // 0x7E + 1 byte offset
@@ -751,7 +724,8 @@ static inline void emit_mov(unsigned char code[], int* pos) {
  * @param source 3 bits mapping the source
  * @param dest 3 bits mapping the destination
  */
-static void emit_modrm(unsigned char code[], int* pos, int mode, int source, int dest) {
+static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
+                       int dest) {
   code[(*pos)++] = (mode << 6) + (source << 3) + dest;
 }
 
@@ -764,4 +738,89 @@ static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code,
                          int integer) {
   code[(*pos)++] = 0xB8 + dst_reg_code;
   emitIntegerInHex(code, pos, integer);
+}
+
+/**
+ * A x86-64 instruction is made of:
+ * - prefix (optional)
+ * - opcode
+ * - ModR/M (optional)
+ * - payload (optional): immediates or memory offsets
+ */
+static void emit_instruction(unsigned char code[], int* pos,
+                             Instruction* inst) {
+  /** REX byte emission:
+   * top 4 bits are fixed: 0100 (bin) / 4 (hex)
+   * bottom 4 are the bits W, R, X, and B
+   * W extends instruction to 64 bits
+   * R extends source register
+   * B extends destination register
+   */
+  unsigned char rex = 0x40;
+  char needs_rex = 0;
+
+  // REX.W: Promotion to 64-bit width
+  if (inst->is_64bit) {
+    rex |= 0x08;
+    needs_rex = 1;
+  }
+
+  // REX.R: Extension for the 'reg' field (source)
+  // used for registers of id 8-15
+  if (inst->use_modrm && inst->reg > 7) {
+    rex |= 0x04;
+    needs_rex = 1;
+  }
+
+  // REX.B: Extension for the 'r/m' field (destination)
+  // used for registers of id 8-15
+  if (inst->use_modrm && inst->rm > 7) {
+    rex |= 0x01;
+    needs_rex = 1;
+  }
+
+  if (needs_rex) {
+    code[(*pos)++] = rex;
+  }
+
+  // Handle 2-byte opcodes (like 0x0FAF for IMUL)
+  if (inst->opcode > 0xFF) {
+    code[(*pos)++] = (inst->opcode >> 8) & 0xFF;  // High byte
+    code[(*pos)++] = inst->opcode & 0xFF;         // Low byte
+  } else {
+    code[(*pos)++] = (unsigned char)inst->opcode;
+  }
+
+  if (inst->use_modrm) {
+    unsigned char modrm = 0;
+
+    // Shift mode to bits 7-6
+    modrm |= (inst->mod << 6);
+
+    // Shift reg to bits 5-3 (Mask with 7 to strip high bit handled by REX)
+    modrm |= ((inst->reg & 7) << 3);
+
+    // Shift rm to bits 2-0 (Mask with 7)
+    modrm |= (inst->rm & 7);
+
+    code[(*pos)++] = modrm;
+  }
+
+  // ---------------------------------------------------------
+  // 4. PAYLOAD PHASE (Displacement & Immediate)
+  // ---------------------------------------------------------
+  if (inst->use_disp) {
+    // For now, assuming 8-bit displacement (signed char) as used in your stack
+    code[(*pos)++] = (unsigned char)(inst->displacement & 0xFF);
+  }
+
+  if (inst->use_imm) {
+    if (inst->imm_size == 4) {
+      // Use your existing helper for 32-bit numbers
+      emitIntegerInHex(code, pos, inst->immediate);
+    } else {
+      // 8-bit immediate
+      code[(*pos)++] = (unsigned char)(inst->immediate & 0xFF);
+    }
+  }
 }
