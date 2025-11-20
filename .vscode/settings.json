@@ -1,5 +1,6 @@
 {
     "files.associations": {
         ".gdbinit": "plaintext"
-    }
+    },
+    "C_Cpp.clang_format_fallbackStyle": "Google",
 }
