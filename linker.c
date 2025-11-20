@@ -17,7 +17,7 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt,
               int* relocCount) {
   for (int i = 0; i < *relocCount; i++) {
     if (lt[rt[i].lineTarget].line == 0) {
-      compilation_error("sbasCompile: jump target is not an executable line",
+      compilationError("sbasCompile: jump target is not an executable line",
                         rt[i].lineTarget);
       return -1;
     }
@@ -40,7 +40,7 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt,
      * instruction.
      */
     int rel32 = targetOffset - (jumpFrom + 4);
-    emit_integer_in_hex(code, &jumpFrom, rel32);
+    emitIntegerInHex(code, &jumpFrom, rel32);
   }
   return 0;
 }

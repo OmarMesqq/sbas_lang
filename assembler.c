@@ -57,7 +57,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
   save_callee_saved_registers(code, &pos);
 
   while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
-    trim_leading_spaces(lineBuffer);
+    trimLeadingSpaces(lineBuffer);
 
     if (lineBuffer[0] == ' ' || lineBuffer[0] == '\n' ||
         lineBuffer[0] == '\0' || lineBuffer[0] == '/') {
@@ -83,7 +83,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
 
         if (sscanf(lineBuffer, "ret %c%d", &retType, &varc) != 2 ||
             (retType != 'v' && retType != '$')) {
-          compilation_error(
+          compilationError(
               "sbasCompile: invalid 'ret' command: expected 'ret <var|$int>",
               line);
           return -1;
@@ -99,7 +99,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
         char operator;
 
         if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
-          compilation_error(
+          compilationError(
               "sbasCompile: invalid command: expected attribution (vX: varpc) "
               "or arithmetic operation (vX = varc op varc)",
               line);
@@ -111,7 +111,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
                    "sbasCompile: invalid local variable index %d. Only v1 "
                    "through v5 are allowed.",
                    idxVar);
-          compilation_error(errorMsgBuffer, line);
+          compilationError(errorMsgBuffer, line);
           return -1;
         }
 
@@ -120,7 +120,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
                    "sbasCompile: invalid operator %c. Only attribution (:) and "
                    "arithmetic operation (=) are supported.",
                    operator);
-          compilation_error(errorMsgBuffer, line);
+          compilationError(errorMsgBuffer, line);
           return -1;
         }
 
@@ -130,7 +130,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix,
                      &idxVarpc) != 3) {
-            compilation_error(
+            compilationError(
                 "sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'",
                 line);
             return -1;
@@ -151,7 +151,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
           if (sscanf(lineBuffer, "v%d = %c%d %c %c%d %127[^\n]", &idxVar,
                      &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2,
                      remaining) != 6) {
-            compilation_error(
+            compilationError(
                 "sbasCompile: invalid arithmetic operation: expected 'vX = "
                 "<vX|$num> op <vX|$num>'",
                 line);
@@ -164,7 +164,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
                 "sbasCompile: invalid arithmetic operation %c. Only addition "
                 "(+), subtraction (-), and multiplication (*) allowed.",
                 op);
-            compilation_error(errorMsgBuffer, line);
+            compilationError(errorMsgBuffer, line);
             return -1;
           }
 
@@ -179,7 +179,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
         unsigned lineTarget;
 
         if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
-          compilation_error(
+          compilationError(
               "sbasCompile: invalid 'iflez' command: expected 'iflez vX line'",
               line);
           return -1;
@@ -201,7 +201,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
         break;
       }
       default: {
-        compilation_error("sbasCompile: unknown SBas command", line);
+        compilationError("sbasCompile: unknown SBas command", line);
         return -1;
       }
     }
@@ -218,8 +218,8 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
   printf("sbasCompile: processed %d lines, writing %d bytes in buffer\n",
          line - 1, pos);
   printf("sbasCompile: %d lines were patched\n", *relocCount);
-  print_line_table(lt, line);
-  print_relocation_table(rt, *relocCount);
+  printLineTable(lt, line);
+  printRelocationTable(rt, *relocCount);
 #endif
   return 0;
 }
@@ -408,7 +408,7 @@ static void emit_return(unsigned char code[], int* pos, char retType,
     code[*pos] = 0xb8;  // movl ..., %eax
     (*pos)++;
 
-    emit_integer_in_hex(code, pos, returnValue);
+    emitIntegerInHex(code, pos, returnValue);
   }
   restore_callee_saved_registers(code, pos);
   emit_epilogue(code, pos);
@@ -565,7 +565,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         } else {
           code[(*pos)++] = 0x81;
           code[(*pos)++] = 0xC0 + dst.reg_code;
-          emit_integer_in_hex(code, pos, idxVarc2);
+          emitIntegerInHex(code, pos, idxVarc2);
         }
         break;
       }
@@ -577,7 +577,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         } else {
           code[(*pos)++] = 0x81;
           code[(*pos)++] = 0xE8 + dst.reg_code;
-          emit_integer_in_hex(code, pos, idxVarc2);
+          emitIntegerInHex(code, pos, idxVarc2);
         }
         break;
       }
@@ -589,7 +589,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         } else {
           code[(*pos)++] = 0x69;
           code[(*pos)++] = 0xC0 + dst.reg_code * 9;
-          emit_integer_in_hex(code, pos, idxVarc2);
+          emitIntegerInHex(code, pos, idxVarc2);
         }
         break;
       }
@@ -742,5 +742,5 @@ static void emit_modrm(unsigned char code[], int* pos, int src_reg_code,
 static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code,
                          int integer) {
   code[(*pos)++] = 0xB8 + dst_reg_code;
-  emit_integer_in_hex(code, pos, integer);
+  emitIntegerInHex(code, pos, integer);
 }

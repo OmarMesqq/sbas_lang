@@ -10,7 +10,7 @@
  * modifying `lineBuffer` in-place.
  * Runs in O(n)
  */
-void trim_leading_spaces(char* lineBuffer) {
+void trimLeadingSpaces(char* lineBuffer) {
   char* p = lineBuffer;
   // early return if string doesn't have leading whitespace
   if (*p != ' ') {
@@ -29,7 +29,7 @@ void trim_leading_spaces(char* lineBuffer) {
   while (*aux != '\0') {
 #ifdef DEBUG
     printf(
-        "trim_leading_spaces: setting lineBuffer[i = %d] (%c) to "
+        "trimLeadingSpaces: setting lineBuffer[i = %d] (%c) to "
         "lineBuffer[spaces + i = %d] (%c)\n",
         i, lineBuffer[i], spaces + i, lineBuffer[spaces + i]);
 #endif
@@ -47,9 +47,9 @@ void trim_leading_spaces(char* lineBuffer) {
  * Prints the entire string `s`, followed by a character-by-character
  * dump of its contents (as character, decimal, and hex).
  */
-void dump_str(char* s) {
+void dumpString(char* s) {
   printf("%s", s);
-  printf("dump_str: dumping string above...\n");
+  printf("dumpString: dumping string above...\n");
   char* p = s;
   while (*p != '\0') {
     printf("char: %c, %d (dec), %02x (hex)\n", *p, *p, *p);
@@ -94,7 +94,7 @@ int stringToInt(char* str) {
  * in Little Endian hexadecimal in the buffer. Used for immediate values and
  * jump offsets.
  */
-void emit_integer_in_hex(unsigned char code[], int* pos, int integer) {
+void emitIntegerInHex(unsigned char code[], int* pos, int integer) {
   code[*pos] = integer & 0xFF;
   (*pos)++;
   code[*pos] = (integer >> 8) & 0xFF;
@@ -110,7 +110,7 @@ void emit_integer_in_hex(unsigned char code[], int* pos, int integer) {
  * @param lt pointer to the `LineTable`
  * @param lines amount of lines in the SBas file
  */
-void print_line_table(LineTable* lt, int lines) {
+void printLineTable(LineTable* lt, int lines) {
   printf("----- START LINE TABLE -----\n");
   printf("%-14s %s\n", "LINE", "START OFFSET (dec)");
   for (int i = 1; i < lines; i++) {
@@ -125,7 +125,7 @@ void print_line_table(LineTable* lt, int lines) {
  * @param rt pointer to the `RelocationTable`
  * @param lines amount of lines in the SBas file
  */
-void print_relocation_table(RelocationTable* rt, int relocCount) {
+void printRelocationTable(RelocationTable* rt, int relocCount) {
   printf("----- START RELOCATION TABLE -----\n");
   printf("%-20s %s\n", "PATCH OFFSET (dec)", "TARGET LINE");
   for (int i = 0; i < relocCount; i++) {
@@ -137,7 +137,7 @@ void print_relocation_table(RelocationTable* rt, int relocCount) {
 /**
  * Prints a SBas compilation error `msg`, found at a given `line`, to `stderr`
  */
-void compilation_error(const char* msg, int line) {
+void compilationError(const char* msg, int line) {
   fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg,
           RESET_COLOR);
 }
