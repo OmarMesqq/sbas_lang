@@ -30,6 +30,7 @@ static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code,
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 
+static RegInfo new_get_local_var_reg(int idx);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 
@@ -367,23 +368,27 @@ static void emit_return(unsigned char code[], int* pos, char retType,
    * emits machine code for returning an SBas variable (v1 through v5)
    */
   if (retType == 'v') {
-    RegInfo reg = get_local_var_reg(returnValue);
+    RegInfo reg = new_get_local_var_reg(returnValue);
     if (reg.reg_code == -1) return;
 
-    emit_rex_byte(code, pos, reg.rex, 0);
+    Instruction retVar = {0};
+    retVar.opcode = 0x89;
+    retVar.is_64bit = 1;
 
-    emit_mov(code, pos);
-
-    // 11 in binary: reg to reg operation
-    int mode = 3;
-    // eax register id is 0
-    emit_modrm(code, pos, mode, reg.reg_code, 0);
+    retVar.use_modrm = 1;
+    retVar.mod = 3;
+    retVar.reg = reg.reg_code;  // from a general purpose reg
+    retVar.rm = 0;  // to eax
+    emit_instruction(code, pos, &retVar);
   }
   /**
    * constant literal return (ret $snum):
    * emits machine code for returning an immediate value (movl $imm32, %eax)
    */
   else if (retType == '$') {
+    // optimization? instruction for putting immediates into eax (default, rd = 0)
+    // https://www.felixcloutier.com/x86/mov
+
     code[*pos] = 0xb8;  // movl ..., %eax
     (*pos)++;
 
@@ -649,6 +654,33 @@ static RegInfo get_local_var_reg(int idx) {
     case 5:
       // v5 -> r15d
       return (RegInfo){7, 1};
+    default:
+      fprintf(stderr, "get_local_var_reg: invalid local variable index: v%d\n",
+              idx);
+      return (RegInfo){-1, -1};
+  }
+}
+
+/**
+ * Will be the new function to replace `get_local_var_reg`
+ */
+static RegInfo new_get_local_var_reg(int idx) {
+  switch (idx) {
+    case 1:
+      // v1 -> ebx
+      return (RegInfo){3, 0};
+    case 2:
+      // v2 -> r12d
+      return (RegInfo){12, 1};
+    case 3:
+      // v3 -> r13d
+      return (RegInfo){13, 1};
+    case 4:
+      // v4 -> r14d
+      return (RegInfo){14, 1};
+    case 5:
+      // v5 -> r15d
+      return (RegInfo){15, 1};
     default:
       fprintf(stderr, "get_local_var_reg: invalid local variable index: v%d\n",
               idx);
