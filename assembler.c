@@ -235,12 +235,16 @@ static void emit_prologue(unsigned char code[], int* pos) {
   (*pos)++;
 
   // movq %rsp, %rbp
-  code[*pos] = 0x48;
-  (*pos)++;
-  code[*pos] = 0x89;
-  (*pos)++;
-  code[*pos] = 0xe5;
-  (*pos)++;
+  Instruction initStackFrame = {0};
+  initStackFrame.opcode = 0x89; // mov 
+  initStackFrame.is_64bit = 1;
+
+  initStackFrame.use_modrm = 1;
+  initStackFrame.mod = 3; // between registers
+  initStackFrame.reg = 4; // from rsp
+  initStackFrame.rm = 5;  // to rbp
+
+  emit_instruction(code, pos, &initStackFrame);
 }
 
 /**
