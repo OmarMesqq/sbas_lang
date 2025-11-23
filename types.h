@@ -63,6 +63,9 @@ typedef struct {
   unsigned char use_imm;
   int immediate;           // 10, 100, etc.
   unsigned char imm_size;  // 1 or 4 bytes
+
+  unsigned char is_small_ret;   // for the optimized mov instruction
+  int small_ret_reg_src_id;
 } Instruction;
 
 #endif

@@ -439,10 +439,17 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
   // att var imm
   else if (varpcPrefix == '$') {
     RegInfo dst = get_local_var_reg(idxVar);
-    if (dst.reg_code == -1) return;
 
-    emit_rex_byte(code, pos, 0, dst.rex);
-    emit_mov_imm(code, pos, dst.reg_code, idxVarpc);
+    Instruction movReg2Reg = {0};
+    movReg2Reg.opcode = 0xB8;  // imm move
+
+    movReg2Reg.is_small_ret = 1;
+    movReg2Reg.small_ret_reg_src_id = dst.reg_code;
+
+    movReg2Reg.use_imm = 1;
+    movReg2Reg.imm_size = 4;
+    movReg2Reg.immediate = idxVarpc;
+    emit_instruction(code, pos, &movReg2Reg);
   }
 }
 
@@ -748,6 +755,7 @@ static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
     needsRex = 1;
     rex |= 0x01;
   }
+
   if (needsRex) {
     code[(*pos)++] = rex;
   }
@@ -808,6 +816,7 @@ static void emit_instruction(unsigned char code[], int* pos,
    */
   unsigned char rex = 0x40;
   char needs_rex = 0;
+  char isSmallRet = inst->is_small_ret;
 
   // REX.W: Promotion to 64-bit width
   if (inst->is_64bit) {
@@ -815,18 +824,25 @@ static void emit_instruction(unsigned char code[], int* pos,
     needs_rex = 1;
   }
 
-  // REX.R: Extension for the 'reg' field (source)
-  // used for registers of id 8-15
-  if (inst->use_modrm && inst->reg > 7) {
-    rex |= 0x04;
-    needs_rex = 1;
-  }
+  if (isSmallRet) {
+    if (inst->small_ret_reg_src_id >= 4) {
+      rex |= 0x01;
+      needs_rex = 1;
+    }
+  } else {
+    // REX.R: Extension for the 'reg' field (source)
+    // used for registers of id 8-15
+    if (inst->use_modrm && inst->reg > 7) {
+      rex |= 0x04;
+      needs_rex = 1;
+    }
 
-  // REX.B: Extension for the 'r/m' field (destination)
-  // used for registers of id 8-15
-  if (inst->use_modrm && inst->rm > 7) {
-    rex |= 0x01;
-    needs_rex = 1;
+    // REX.B: Extension for the 'r/m' field (destination)
+    // used for registers of id 8-15
+    if (inst->use_modrm && inst->rm > 7) {
+      rex |= 0x01;
+      needs_rex = 1;
+    }
   }
 
   if (needs_rex) {
@@ -838,7 +854,11 @@ static void emit_instruction(unsigned char code[], int* pos,
     code[(*pos)++] = (inst->opcode >> 8) & 0xFF;  // High byte
     code[(*pos)++] = inst->opcode & 0xFF;         // Low byte
   } else {
-    code[(*pos)++] = (unsigned char)inst->opcode;
+    unsigned int combinedOpcode = inst->opcode;
+    if (inst->is_small_ret) {
+      combinedOpcode += inst->small_ret_reg_src_id;
+    }
+    code[(*pos)++] = (unsigned char)combinedOpcode;
   }
 
   if (inst->use_modrm) {
