@@ -389,10 +389,13 @@ static void emit_return(unsigned char code[], int* pos, char retType,
     // optimization? instruction for putting immediates into eax (default, rd =
     // 0) https://www.felixcloutier.com/x86/mov
 
-    code[*pos] = 0xb8;  // movl ..., %eax
-    (*pos)++;
-
-    emitIntegerInHex(code, pos, returnValue);
+    Instruction retVar = {0};
+    retVar.opcode = 0xb8;  // movl ..., %eax
+    retVar.is_small_ret = 1;
+    retVar.use_imm = 1;
+    retVar.immediate = returnValue;
+    retVar.imm_size = 4;
+    emit_instruction(code, pos, &retVar);
   }
   restore_callee_saved_registers(code, pos);
   emit_epilogue(code, pos);
