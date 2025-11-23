@@ -406,15 +406,20 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
                              char varpcPrefix, int idxVarpc) {
   // att var to var
   if (varpcPrefix == 'v') {
-    RegInfo src = get_local_var_reg(idxVarpc);
-    RegInfo dst = get_local_var_reg(idxVar);
+    RegInfo src = new_get_local_var_reg(idxVarpc);
+    RegInfo dst = new_get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
-    emit_rex_byte(code, pos, src.rex, dst.rex);
-    emit_mov(code, pos);
-    // 11 in binary: reg to reg operation
-    int mode = 3;
-    emit_modrm(code, pos, mode, src.reg_code, dst.reg_code);
+    Instruction movReg2Reg = {0};
+    movReg2Reg.opcode = 0x89; // standard move
+    movReg2Reg.is_64bit = 1;  // except for v1, v2-v5 are extended registers
+
+    movReg2Reg.use_modrm = 1;
+    movReg2Reg.mod = 3;
+    movReg2Reg.reg = src.reg_code;
+    movReg2Reg.rm = dst.reg_code;
+
+    emit_instruction(code, pos, &movReg2Reg);
   }
   // att var param
   else if (varpcPrefix == 'p') {
