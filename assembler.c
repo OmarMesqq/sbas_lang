@@ -516,8 +516,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
    * <op> <rightOperand>, <attributedVar>
    */
   if (varc2Prefix == 'v') {
-    RegInfo src = get_local_var_reg(idxVarc2);
-    RegInfo dst = get_local_var_reg(idxVar);
+    Instruction arithmOp = {0};
+    RegInfo src = new_get_local_var_reg(idxVarc2);
+    RegInfo dst = new_get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
     // Special case for multiplication: src and dst fields are swapped in REX
@@ -528,18 +529,15 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
       dst.rex = tmp;
     }
 
-    emit_rex_byte(code, pos, src.rex, dst.rex);
-
     switch (op) {
       case '+':
-        code[(*pos)++] = 0x01;
+        arithmOp.opcode = 0x01;
         break;
       case '-':
-        code[(*pos)++] = 0x29;
+        arithmOp.opcode = 0x29;
         break;
       case '*':
-        code[(*pos)++] = 0x0F;
-        code[(*pos)++] = 0xAF;
+        arithmOp.opcode = (0x0F << 8) | 0xAF;
         break;
       default:
         fprintf(stderr, "emit_arithmetic_operation: invalid operation: %c\n",
@@ -553,10 +551,12 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
       dst.reg_code = src.reg_code;
       src.reg_code = temp;
     }
-    // 11 in binary: reg to reg operation
-    int mode = 3;
-    emit_modrm(code, pos, mode, src.reg_code, dst.reg_code);
-
+    
+    arithmOp.use_modrm = 1;
+    arithmOp.mod = 3;
+    arithmOp.reg = src.reg_code;
+    arithmOp.rm = dst.reg_code;
+    emit_instruction(code, pos, &arithmOp);
   } else if (varc2Prefix == '$') {
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
