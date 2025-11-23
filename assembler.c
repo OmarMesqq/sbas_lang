@@ -25,8 +25,6 @@ static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
 static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
                        int dest);
 static inline void emit_mov(unsigned char code[], int* pos);
-static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code,
-                         int integer);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 
@@ -483,23 +481,30 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
    * mov <leftOperand>, <attributedVar>
    */
   if (varc1Prefix == 'v') {
-    RegInfo src = get_local_var_reg(idxVarc1);
-    RegInfo dst = get_local_var_reg(idxVar);
+    RegInfo src = new_get_local_var_reg(idxVarc1);
+    RegInfo dst = new_get_local_var_reg(idxVar);
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
-    emit_rex_byte(code, pos, src.rex, dst.rex);
-    emit_mov(code, pos);
-    // 11 in binary: reg to reg operation
-    int mode = 3;
-    emit_modrm(code, pos, mode, src.reg_code, dst.reg_code);
+    Instruction movReg2Reg = {0};
+    movReg2Reg.opcode = 0x89;
+    movReg2Reg.use_modrm = 1;
+    movReg2Reg.mod = 3;
+    movReg2Reg.reg = src.reg_code;
+    movReg2Reg.rm = dst.reg_code;
 
+    emit_instruction(code, pos, &movReg2Reg);
   } else if (varc1Prefix == '$') {
     RegInfo dst = get_local_var_reg(idxVar);
-    if (dst.reg_code == -1) return;
+    Instruction movReg2Reg = {0};
+    movReg2Reg.opcode = 0xB8;  // imm move
 
-    emit_rex_byte(code, pos, 0, dst.rex);
+    movReg2Reg.is_small_ret = 1;
+    movReg2Reg.small_ret_reg_src_id = dst.reg_code;
 
-    emit_mov_imm(code, pos, dst.reg_code, idxVarc1);
+    movReg2Reg.use_imm = 1;
+    movReg2Reg.imm_size = 4;
+    movReg2Reg.immediate = idxVarc1;
+    emit_instruction(code, pos, &movReg2Reg);
   } else {
     fprintf(stderr, "emit_arithmetic_operation: invalid varc1Prefix: %c\n",
             varc1Prefix);
@@ -787,18 +792,6 @@ static inline void emit_mov(unsigned char code[], int* pos) {
 static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
                        int dest) {
   code[(*pos)++] = (mode << 6) + (source << 3) + dest;
-}
-
-/**
- * Emits `mov` $imm, <reg>.
- * Does not use ModRM byte, rather:
- * 0xB8 + dst_reg_code followed by 4 bytes of imm
- */
-static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code,
-                         int integer) {
-  int combinedMov = 0xB8 + dst_reg_code;
-  code[(*pos)++] = combinedMov;
-  emitIntegerInHex(code, pos, integer);
 }
 
 /**
