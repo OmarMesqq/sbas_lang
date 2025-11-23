@@ -736,16 +736,21 @@ static RegInfo get_param_reg(int idx) {
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
                           char dst_rex) {
   unsigned char rex = 0x40;
+  char needsRex = 0;
 
   if (src_rex) {
     // REX byte with bit R set (for source register)
+    needsRex = 1;
     rex |= 0x04;
   }
   if (dst_rex) {
     // REX byte with bit B set (for target register)
+    needsRex = 1;
     rex |= 0x01;
   }
+  if (needsRex) {
   code[(*pos)++] = rex;
+  }
 }
 
 /**
