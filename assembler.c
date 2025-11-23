@@ -22,8 +22,6 @@ static void emit_cmp(unsigned char code[], int* pos, int varIndex);
 static void emit_jle(unsigned char code[], int* pos);
 static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
                           char dst_rex);
-static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
-                       int dest);
 static inline void emit_mov(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
@@ -777,22 +775,6 @@ static inline void emit_mov(unsigned char code[], int* pos) {
   (*pos)++;
 }
 
-/**
- * The ModRM byte tells the CPU what are the operands involved in an operation.
- * It is built like this:
- *
- * mod |  reg |  r/m
- *
- * bb  | bbb  |  bbb
- *
- * @param mode 2 bits telling the instruction is between which parts
- * @param source 3 bits mapping the source
- * @param dest 3 bits mapping the destination
- */
-static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
-                       int dest) {
-  code[(*pos)++] = (mode << 6) + (source << 3) + dest;
-}
 
 /**
  * A x86-64 instruction is made of:
