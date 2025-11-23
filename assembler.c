@@ -237,13 +237,13 @@ static void emit_prologue(unsigned char code[], int* pos) {
 
   // movq %rsp, %rbp
   Instruction initStackFrame = {0};
-  initStackFrame.opcode = 0x89; // mov 
+  initStackFrame.opcode = 0x89;  // mov
   initStackFrame.is_64bit = 1;
 
   initStackFrame.use_modrm = 1;
-  initStackFrame.mod = 3; // between registers
-  initStackFrame.reg = 4; // from rsp
-  initStackFrame.rm = 5;  // to rbp
+  initStackFrame.mod = 3;  // between registers
+  initStackFrame.reg = 4;  // from rsp
+  initStackFrame.rm = 5;   // to rbp
 
   emit_instruction(code, pos, &initStackFrame);
 }
@@ -262,29 +262,29 @@ static void emit_prologue(unsigned char code[], int* pos) {
 static void save_callee_saved_registers(unsigned char code[], int* pos) {
   // adjust stack pointer: subq $48, %rsp
   Instruction sub = {0};
-  sub.opcode = 0x83;     // 0x83 = Arithmetic with byte immediate
+  sub.opcode = 0x83;  // 0x83 = Arithmetic with byte immediate
   sub.is_64bit = 1;      
   sub.use_modrm = 1;     
-  sub.mod = 3;           // 11 = Register Direct Mode
-  sub.reg = 5;           // 5 = Opcode Extension for SUB
-  sub.rm = 4;            // 4 = RSP Register ID
+  sub.mod = 3;  // 11 = Register Direct Mode
+  sub.reg = 5;  // 5 = Opcode Extension for SUB
+  sub.rm = 4;   // 4 = RSP Register ID
   sub.use_imm = 1;
-  sub.imm_size = 1;      // 1 byte immediate
-  sub.immediate = 48;    // Value 48
+  sub.imm_size = 1;    // 1 byte immediate
+  sub.immediate = 48;  // Value 48
   emit_instruction(code, pos, &sub);
 
   // 2. Save Registers to Stack
   // Create a template for "MOV Reg to Memory[RBP + Offset]"
   Instruction mov = {0};
-  mov.opcode = 0x89;     // MOV r/m64, r64
-  mov.is_64bit = 1;      // REX.W
+  mov.opcode = 0x89;  // MOV r/m64, r64
+  mov.is_64bit = 1;   // REX.W
   mov.use_modrm = 1;
-  mov.mod = 1;           // 01 = Memory + Byte Displacement
-  mov.rm = 5;            // Destination Base is RBP (ID 5)
-  mov.use_disp = 1;      // We are using a displacement
+  mov.mod = 1;       // 01 = Memory + Byte Displacement
+  mov.rm = 5;        // Destination Base is RBP (ID 5)
+  mov.use_disp = 1;  // We are using a displacement
 
   // Save RBX at -8: movq %rbx, -8(%rbp)
-  mov.reg = 3;           // Source Register
+  mov.reg = 3;  // Source Register
   mov.displacement = -8;
   emit_instruction(code, pos, &mov);
 
@@ -315,15 +315,15 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
 static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   // Create a template for "MOV Memory[RBP + Offset] to Reg"
   Instruction mov = {0};
-  mov.opcode = 0x8B;     // 0x8B = "Move FROM Memory TO Register" 
-  mov.is_64bit = 1;      // REX.W
+  mov.opcode = 0x8B;  // 0x8B = "Move FROM Memory TO Register"
+  mov.is_64bit = 1;   // REX.W
   mov.use_modrm = 1;
-  mov.mod = 1;           // 01 = Memory + Byte Displacement
-  mov.rm = 5;            // Source Base is RBP (ID 5)
-  mov.use_disp = 1;      // We are using a displacement
+  mov.mod = 1;       // 01 = Memory + Byte Displacement
+  mov.rm = 5;        // Source Base is RBP (ID 5)
+  mov.use_disp = 1;  // We are using a displacement
 
   // Restore RBX (ID 3) from -8
-  mov.reg = 3;           // Destination Register
+  mov.reg = 3;  // Destination Register
   mov.displacement = -8;
   emit_instruction(code, pos, &mov);
 
@@ -378,7 +378,7 @@ static void emit_return(unsigned char code[], int* pos, char retType,
     retVar.use_modrm = 1;
     retVar.mod = 3;
     retVar.reg = reg.reg_code;  // from a general purpose reg
-    retVar.rm = 0;  // to eax
+    retVar.rm = 0;              // to eax
     emit_instruction(code, pos, &retVar);
   }
   /**
@@ -386,8 +386,8 @@ static void emit_return(unsigned char code[], int* pos, char retType,
    * emits machine code for returning an immediate value (movl $imm32, %eax)
    */
   else if (retType == '$') {
-    // optimization? instruction for putting immediates into eax (default, rd = 0)
-    // https://www.felixcloutier.com/x86/mov
+    // optimization? instruction for putting immediates into eax (default, rd =
+    // 0) https://www.felixcloutier.com/x86/mov
 
     code[*pos] = 0xb8;  // movl ..., %eax
     (*pos)++;
@@ -411,8 +411,8 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
     Instruction movReg2Reg = {0};
-    movReg2Reg.opcode = 0x89; // standard move
-    movReg2Reg.is_64bit = 1;  // except for v1, v2-v5 are extended registers
+    movReg2Reg.opcode = 0x89;  // standard move
+    movReg2Reg.is_64bit = 1;   // except for v1, v2-v5 are extended registers
 
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
@@ -428,7 +428,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
     if (src.reg_code == -1 || dst.reg_code == -1) return;
 
     Instruction movReg2Reg = {0};
-    movReg2Reg.opcode = 0x89; // standard move
+    movReg2Reg.opcode = 0x89;  // standard move
 
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
