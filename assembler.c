@@ -263,8 +263,8 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   // adjust stack pointer: subq $48, %rsp
   Instruction sub = {0};
   sub.opcode = 0x83;  // 0x83 = Arithmetic with byte immediate
-  sub.is_64bit = 1;      
-  sub.use_modrm = 1;     
+  sub.is_64bit = 1;
+  sub.use_modrm = 1;
   sub.mod = 3;  // 11 = Register Direct Mode
   sub.reg = 5;  // 5 = Opcode Extension for SUB
   sub.rm = 4;   // 4 = RSP Register ID
@@ -289,7 +289,7 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   emit_instruction(code, pos, &mov);
 
   // Save R12 at -16: movq %r12, -16(%rbp)
-  mov.reg = 12;           
+  mov.reg = 12;
   mov.displacement = -16;
   emit_instruction(code, pos, &mov);
 
@@ -328,7 +328,7 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   emit_instruction(code, pos, &mov);
 
   // Restore R12 (ID 12) from -16
-  mov.reg = 12;          
+  mov.reg = 12;
   mov.displacement = -16;
   emit_instruction(code, pos, &mov);
 
@@ -749,7 +749,7 @@ static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
     rex |= 0x01;
   }
   if (needsRex) {
-  code[(*pos)++] = rex;
+    code[(*pos)++] = rex;
   }
 }
 
@@ -785,7 +785,8 @@ static void emit_modrm(unsigned char code[], int* pos, int mode, int source,
  */
 static void emit_mov_imm(unsigned char code[], int* pos, int dst_reg_code,
                          int integer) {
-  code[(*pos)++] = 0xB8 + dst_reg_code;
+  int combinedMov = 0xB8 + dst_reg_code;
+  code[(*pos)++] = combinedMov;
   emitIntegerInHex(code, pos, integer);
 }
 
