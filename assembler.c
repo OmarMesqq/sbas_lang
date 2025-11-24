@@ -354,6 +354,7 @@ static void emit_epilogue(unsigned char code[], int* pos) {
 
 static void emit_return(unsigned char code[], int* pos, char retType,
                         int returnValue) {
+  Instruction retVar = {0};
   /**
    * local variable return (ret vX):
    * emits machine code for returning an SBas variable (v1 through v5)
@@ -362,7 +363,6 @@ static void emit_return(unsigned char code[], int* pos, char retType,
     int regCode = get_hardware_reg_index('v', returnValue);
     if (regCode == -1) return;
 
-    Instruction retVar = {0};
     retVar.opcode = 0x89;
     retVar.is_64bit = 1;
 
@@ -380,7 +380,6 @@ static void emit_return(unsigned char code[], int* pos, char retType,
     // optimization? instruction for putting immediates into eax (default, rd =
     // 0) https://www.felixcloutier.com/x86/mov
 
-    Instruction retVar = {0};
     retVar.opcode = 0xb8;  // movl ..., %eax
     retVar.is_small_ret = 1;
     retVar.use_imm = 1;
@@ -398,13 +397,13 @@ static void emit_return(unsigned char code[], int* pos, char retType,
  */
 static void emit_attribution(unsigned char code[], int* pos, int idxVar,
                              char varpcPrefix, int idxVarpc) {
+  Instruction movReg2Reg = {0};
   // att var to var
   if (varpcPrefix == 'v') {
     int srcRegCode = get_hardware_reg_index('v', idxVarpc);
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0x89;  // standard move
     movReg2Reg.is_64bit = 1;   // except for v1, v2-v5 are extended registers
 
@@ -421,7 +420,6 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0x89;  // standard move
 
     movReg2Reg.use_modrm = 1;
@@ -434,7 +432,6 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
   else if (varpcPrefix == '$') {
     int dstRegCode = get_hardware_reg_index('v', idxVar);
 
-    Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0xB8;  // imm move
 
     movReg2Reg.is_small_ret = 1;
@@ -469,6 +466,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     idxVarc2 = tmpIdx;
   }
 
+  Instruction movReg2Reg = {0};
   /**
    * Emits first instruction of an arithmetic operation:
    * mov <leftOperand>, <attributedVar>
@@ -478,7 +476,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0x89;
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
@@ -488,7 +485,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     emit_instruction(code, pos, &movReg2Reg);
   } else if (varc1Prefix == '$') {
     int dstRegCode = get_hardware_reg_index('v', idxVar);
-    Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0xB8;  // imm move
 
     movReg2Reg.is_small_ret = 1;
@@ -504,12 +500,12 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     return;
   }
 
+  Instruction arithmOp = {0};
   /**
    * Emits second instruction of an arithmetic operation:
    * <op> <rightOperand>, <attributedVar>
    */
   if (varc2Prefix == 'v') {
-    Instruction arithmOp = {0};
     int srcRegCode = get_hardware_reg_index('v', idxVarc2);
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
@@ -546,7 +542,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (dstRegCode == -1) return;
 
-    Instruction i = {0};
     // TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg
     // field
     // TODO: in small multiplication, code[(*pos)++] = dstRegCode * 9; is
@@ -561,80 +556,80 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     switch (op) {
       case '+': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          i.opcode = 0x83;  // add(b) imm8, r/m32
-          i.use_imm = 1;
-          i.imm_size = 1;  // 8 bits
-          i.immediate = idxVarc2;
-          i.isArithmOp = 1;
-          i.use_modrm = 1;
-          i.mod = 3;
-          i.rm = dstRegCode;
+          arithmOp.opcode = 0x83;  // add(b) imm8, r/m32
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 1;  // 8 bits
+          arithmOp.immediate = idxVarc2;
+          arithmOp.isArithmOp = 1;
+          arithmOp.use_modrm = 1;
+          arithmOp.mod = 3;
+          arithmOp.rm = dstRegCode;
 
-          emit_instruction(code, pos, &i);
+          emit_instruction(code, pos, &arithmOp);
         } else {
-          i.opcode = 0x81;  // add(l) imm32, r/m32
-          i.use_imm = 1;
-          i.imm_size = 4;  // 32 bits
-          i.immediate = idxVarc2;
-          i.isArithmOp = 1;
-          i.use_modrm = 1;
-          i.mod = 3;
-          i.rm = dstRegCode;
-          emit_instruction(code, pos, &i);
+          arithmOp.opcode = 0x81;  // add(l) imm32, r/m32
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 4;  // 32 bits
+          arithmOp.immediate = idxVarc2;
+          arithmOp.isArithmOp = 1;
+          arithmOp.use_modrm = 1;
+          arithmOp.mod = 3;
+          arithmOp.rm = dstRegCode;
+          emit_instruction(code, pos, &arithmOp);
         }
         break;
       }
       case '-': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          i.opcode = 0x83;  // sub(b) imm8, r/m32
-          i.use_imm = 1;
-          i.imm_size = 1;  // 8 bits
-          i.immediate = idxVarc2;
-          i.isArithmOp = 1;
-          i.use_modrm = 1;
-          i.mod = 3;
-          i.rm = dstRegCode;
-          i.reg = 5;  // 101 in reg, indicating subtraction
-          emit_instruction(code, pos, &i);
+          arithmOp.opcode = 0x83;  // sub(b) imm8, r/m32
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 1;  // 8 bits
+          arithmOp.immediate = idxVarc2;
+          arithmOp.isArithmOp = 1;
+          arithmOp.use_modrm = 1;
+          arithmOp.mod = 3;
+          arithmOp.rm = dstRegCode;
+          arithmOp.reg = 5;  // 101 in reg, indicating subtraction
+          emit_instruction(code, pos, &arithmOp);
         } else {
-          i.opcode = 0x81;  // sub(l) imm32, r/m32
-          i.use_imm = 1;
-          i.imm_size = 4;  // 32 bits
-          i.immediate = idxVarc2;
-          i.isArithmOp = 1;
-          i.use_modrm = 1;
-          i.mod = 3;
-          i.rm = dstRegCode;
-          i.reg = 5;  // 101 in reg, indicating subtraction
-          emit_instruction(code, pos, &i);
+          arithmOp.opcode = 0x81;  // sub(l) imm32, r/m32
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 4;  // 32 bits
+          arithmOp.immediate = idxVarc2;
+          arithmOp.isArithmOp = 1;
+          arithmOp.use_modrm = 1;
+          arithmOp.mod = 3;
+          arithmOp.rm = dstRegCode;
+          arithmOp.reg = 5;  // 101 in reg, indicating subtraction
+          emit_instruction(code, pos, &arithmOp);
         }
         break;
       }
       case '*': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          i.opcode = 0x6B;  // imul(b) imm8, r/m32
-          i.use_imm = 1;
-          i.imm_size = 1;  // 8 bits
-          i.immediate = idxVarc2;
-          i.isArithmOp = 1;
-          i.use_modrm = 1;
-          i.mod = 3;
+          arithmOp.opcode = 0x6B;  // imul(b) imm8, r/m32
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 1;  // 8 bits
+          arithmOp.immediate = idxVarc2;
+          arithmOp.isArithmOp = 1;
+          arithmOp.use_modrm = 1;
+          arithmOp.mod = 3;
           // src and dst register are the same
-          i.rm = dstRegCode;
-          i.reg = dstRegCode;
-          emit_instruction(code, pos, &i);
+          arithmOp.rm = dstRegCode;
+          arithmOp.reg = dstRegCode;
+          emit_instruction(code, pos, &arithmOp);
         } else {
-          i.opcode = 0x69;  // imul(l) imm32, r/m32
-          i.use_imm = 1;
-          i.imm_size = 4;  // 32 bits
-          i.immediate = idxVarc2;
-          i.isArithmOp = 1;
-          i.use_modrm = 1;
-          i.mod = 3;
+          arithmOp.opcode = 0x69;  // imul(l) imm32, r/m32
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 4;  // 32 bits
+          arithmOp.immediate = idxVarc2;
+          arithmOp.isArithmOp = 1;
+          arithmOp.use_modrm = 1;
+          arithmOp.mod = 3;
           // src and dst register are the same
-          i.rm = dstRegCode;
-          i.reg = dstRegCode;
-          emit_instruction(code, pos, &i);
+          arithmOp.rm = dstRegCode;
+          arithmOp.reg = dstRegCode;
+          emit_instruction(code, pos, &arithmOp);
         }
         break;
       }
