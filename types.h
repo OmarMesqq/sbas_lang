@@ -66,6 +66,8 @@ typedef struct {
 
   unsigned char is_small_ret;  // for the optimized mov instruction
   int small_ret_reg_src_id;
+
+  unsigned char isArithmOp;
 } Instruction;
 
 #endif

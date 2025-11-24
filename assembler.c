@@ -30,6 +30,8 @@ static RegInfo new_get_local_var_reg(int idx);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
 
+static char shouldPrint = 0;
+
 /**
  * Receives an **open** file handle of the SBas file and
  * attempts to write corresponding logic in x86-64 machine code to a buffer
@@ -549,19 +551,20 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
       dst.reg_code = src.reg_code;
       src.reg_code = temp;
     }
-    
+
     arithmOp.use_modrm = 1;
     arithmOp.mod = 3;
     arithmOp.reg = src.reg_code;
     arithmOp.rm = dst.reg_code;
     emit_instruction(code, pos, &arithmOp);
   } else if (varc2Prefix == '$') {
+    // printf("emitting 2nd instruction for arithm op for line: %s\n", lineBuffer);
+    char newPath = 1;
+    shouldPrint = 1;
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
 
-    if (dst.rex) {
-      emit_rex_byte(code, pos, 1, dst.rex);
-    }
+    Instruction i = {0};
 
     /**
      * Emit operations.
@@ -572,10 +575,21 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     switch (op) {
       case '+': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          code[(*pos)++] = 0x83;
-          code[(*pos)++] = 0xC0 + dst.reg_code;
-          code[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
+          dst = new_get_local_var_reg(idxVar);
+          i.opcode = 0x83;
+          i.use_imm = 1;
+          i.imm_size = 1;
+          i.immediate = idxVarc2;
+          i.isArithmOp = 1;
+          i.use_modrm = 1;
+          i.mod = 3;
+          i.rm = dst.reg_code;
+
+          emit_instruction(code, pos, &i);
         } else {
+          if (dst.rex) {
+            emit_rex_byte(code, pos, 1, dst.rex);
+          }
           code[(*pos)++] = 0x81;
           code[(*pos)++] = 0xC0 + dst.reg_code;
           emitIntegerInHex(code, pos, idxVarc2);
@@ -583,6 +597,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         break;
       }
       case '-': {
+        if (dst.rex) {
+          emit_rex_byte(code, pos, 1, dst.rex);
+        }
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
           code[(*pos)++] = 0x83;
           code[(*pos)++] = 0xE8 + dst.reg_code;
@@ -595,6 +612,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         break;
       }
       case '*': {
+        if (dst.rex) {
+          emit_rex_byte(code, pos, 1, dst.rex);
+        }
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
           code[(*pos)++] = 0x6B;
           code[(*pos)++] = 0xC0 + dst.reg_code * 9;
@@ -611,6 +631,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
                 op);
         return;
     }
+    shouldPrint = 0;
   }
 }
 
