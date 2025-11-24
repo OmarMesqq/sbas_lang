@@ -23,9 +23,7 @@ static void emit_jle(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 
-static int new_get_local_var_reg(int idx);
-static int get_local_var_reg(int idx);
-static int get_param_reg(int idx);
+static int get_hardware_reg_index(char type, int idx);
 
 /**
  * Receives an **open** file handle of the SBas file and
@@ -361,7 +359,7 @@ static void emit_return(unsigned char code[], int* pos, char retType,
    * emits machine code for returning an SBas variable (v1 through v5)
    */
   if (retType == 'v') {
-    int regCode = new_get_local_var_reg(returnValue);
+    int regCode = get_hardware_reg_index('v', returnValue);
     if (regCode == -1) return;
 
     Instruction retVar = {0};
@@ -371,7 +369,7 @@ static void emit_return(unsigned char code[], int* pos, char retType,
     retVar.use_modrm = 1;
     retVar.mod = 3;
     retVar.reg = regCode;  // from a general purpose reg
-    retVar.rm = 0;              // to eax
+    retVar.rm = 0;         // to eax
     emit_instruction(code, pos, &retVar);
   }
   /**
@@ -402,8 +400,8 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
                              char varpcPrefix, int idxVarpc) {
   // att var to var
   if (varpcPrefix == 'v') {
-    int srcRegCode = new_get_local_var_reg(idxVarpc);
-    int dstRegCode = new_get_local_var_reg(idxVar);
+    int srcRegCode = get_hardware_reg_index('v', idxVarpc);
+    int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
     Instruction movReg2Reg = {0};
@@ -419,8 +417,8 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
   }
   // att var param
   else if (varpcPrefix == 'p') {
-    int srcRegCode = get_param_reg(idxVarpc);
-    int dstRegCode = new_get_local_var_reg(idxVar);
+    int srcRegCode = get_hardware_reg_index('p', idxVarpc);
+    int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
     Instruction movReg2Reg = {0};
@@ -434,7 +432,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
   }
   // att var imm
   else if (varpcPrefix == '$') {
-    int dstRegCode = get_local_var_reg(idxVar);
+    int dstRegCode = get_hardware_reg_index('v', idxVar);
 
     Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0xB8;  // imm move
@@ -476,8 +474,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
    * mov <leftOperand>, <attributedVar>
    */
   if (varc1Prefix == 'v') {
-    int srcRegCode = new_get_local_var_reg(idxVarc1);
-    int dstRegCode = new_get_local_var_reg(idxVar);
+    int srcRegCode = get_hardware_reg_index('v', idxVarc1);
+    int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
     Instruction movReg2Reg = {0};
@@ -489,7 +487,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
 
     emit_instruction(code, pos, &movReg2Reg);
   } else if (varc1Prefix == '$') {
-    int dstRegCode = get_local_var_reg(idxVar);
+    int dstRegCode = get_hardware_reg_index('v', idxVar);
     Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0xB8;  // imm move
 
@@ -512,8 +510,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
    */
   if (varc2Prefix == 'v') {
     Instruction arithmOp = {0};
-    int srcRegCode = new_get_local_var_reg(idxVarc2);
-    int dstRegCode = new_get_local_var_reg(idxVar);
+    int srcRegCode = get_hardware_reg_index('v', idxVarc2);
+    int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
     switch (op) {
@@ -545,7 +543,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     arithmOp.rm = dstRegCode;
     emit_instruction(code, pos, &arithmOp);
   } else if (varc2Prefix == '$') {
-    int dstRegCode = new_get_local_var_reg(idxVar);
+    int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (dstRegCode == -1) return;
 
     Instruction i = {0};
@@ -655,7 +653,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
  * as well as the jle conditional jump opcode
  */
 static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
-  int regCode = new_get_local_var_reg(varIndex);
+  int regCode = get_hardware_reg_index('v', varIndex);
   if (regCode == -1) return;
 
   Instruction cmp = {0};
@@ -685,89 +683,41 @@ static void emit_jle(unsigned char code[], int* pos) {
 }
 
 /**
- * Returns the register where a local variable v1 through v5 is stored
- *
- * The `reg_code` field is a 3 bit value which represents the register code in
- * the ModRM byte The `rex` fields indicates if such register is extended (r12d
- * - r15d) i.e. in order to access it, a REX prefix byte is necessary.
- *
- * The function has no info regarding the usage of the register as source or
- * target. The caller knows whether the register is the source (`reg`) or the
- * target (`r/m`) of the operation in the ModRM byte, and, as such, will set the
- * REX.R or REX.B bits for source and target respectively.
+ * Unified Register Mapper.
+ * Returns the Full Hardware Index (0-15).
+ * * Supports:
+ * - Locals ('v'): v1(RBX), v2(R12), v3(R13), v4(R14), v5(R15)
+ * - Params ('p'): p1(EDI), p2(ESI), p3(EDX)
  */
-static int get_local_var_reg(int idx) {
-  switch (idx) {
-    case 1:
-      // v1 -> ebx
-      return 3;
-    case 2:
-      // v2 -> r12d
-      return 4;
-    case 3:
-      // v3 -> r13d
-      return 5;
-    case 4:
-      // v4 -> r14d
-      return 6;
-    case 5:
-      // v5 -> r15d
-      return 7;
-    default:
-      fprintf(stderr, "get_local_var_reg: invalid local variable index: v%d\n",
-              idx);
-      return -1;
+static int get_hardware_reg_index(char type, int idx) {
+  if (type == 'v') {
+    switch (idx) {
+      case 1:
+        return 3;  // RBX
+      case 2:
+        return 12;  // R12
+      case 3:
+        return 13;  // R13
+      case 4:
+        return 14;  // R14
+      case 5:
+        return 15;  // R15
+      default:
+        return -1;
+    }
+  } else if (type == 'p') {
+    switch (idx) {
+      case 1:
+        return 7;  // RDI (System V ABI 1st arg)
+      case 2:
+        return 6;  // RSI (System V ABI 2nd arg)
+      case 3:
+        return 2;  // RDX (System V ABI 3rd arg)
+      default:
+        return -1;
+    }
   }
-}
-
-/**
- * Will be the new function to replace `get_local_var_reg`
- */
-static int new_get_local_var_reg(int idx) {
-  switch (idx) {
-    case 1:
-      // v1 -> ebx
-      return 3;
-    case 2:
-      // v2 -> r12d
-      return 12;
-    case 3:
-      // v3 -> r13d
-      return 13;
-    case 4:
-      // v4 -> r14d
-      return 14;
-    case 5:
-      // v5 -> r15d
-      return 15;
-    default:
-      fprintf(stderr, "get_local_var_reg: invalid local variable index: v%d\n",
-              idx);
-      return -1;
-  }
-}
-
-/**
- * Returns the register where a parameter p1 through p3 is sent to a function
- * according to the System V ABI
- *
- * The `rex` field here is always zero because these registers are not extended.
- */
-static int get_param_reg(int idx) {
-  switch (idx) {
-    case 1:
-      // p1 -> edi
-      return 7;
-    case 2:
-      // p2 -> esi
-      return 6;
-    case 3:
-      // p3 -> edx
-      return 2;
-    default:
-      fprintf(stderr, "get_param_reg: invalid parameter index: p%d\n", idx);
-      return -1;
-  }
+  return -1;
 }
 
 /**
@@ -788,7 +738,6 @@ static void emit_instruction(unsigned char code[], int* pos,
    */
   unsigned char rex = 0x40;
   char needs_rex = 0;
-  char isSmallRet = inst->is_small_ret;
 
   // REX.W: Promotion to 64-bit width
   if (inst->is_64bit) {
@@ -796,9 +745,11 @@ static void emit_instruction(unsigned char code[], int* pos,
     needs_rex = 1;
   }
 
-  if (isSmallRet) {
-    if (inst->small_ret_reg_src_id >= 4) {
-      rex |= 0x01;
+  if (inst->is_small_ret) {
+    // Case: Opcode embedding (e.g. 0xB8 + reg)
+    // We only need REX.B if the register index is 8-15 (r8-r15)
+    if (inst->small_ret_reg_src_id >= 7) {
+      rex |= 0x01;  // REX.B
       needs_rex = 1;
     }
   } else if (inst->isCmp) {
@@ -826,14 +777,15 @@ static void emit_instruction(unsigned char code[], int* pos,
     code[(*pos)++] = rex;
   }
 
-  // Handle 2-byte opcodes (like 0x0FAF for IMUL)
+  // Handle 2-byte opcodes (like imul's 0x0FAF)
   if (inst->opcode > 0xFF) {
     code[(*pos)++] = (inst->opcode >> 8) & 0xFF;  // High byte
     code[(*pos)++] = inst->opcode & 0xFF;         // Low byte
   } else {
     unsigned int combinedOpcode = inst->opcode;
+
     if (inst->is_small_ret) {
-      combinedOpcode += inst->small_ret_reg_src_id;
+      combinedOpcode += (inst->small_ret_reg_src_id & 7);
     }
     code[(*pos)++] = (unsigned char)combinedOpcode;
   }
@@ -841,26 +793,20 @@ static void emit_instruction(unsigned char code[], int* pos,
   if (inst->use_modrm) {
     unsigned char modrm = 0;
 
-    // Shift mode to bits 7-6
     modrm |= (inst->mod << 6);
-
-    // Shift reg to bits 5-3 (Mask with 7 to strip high bit handled by REX)
     modrm |= ((inst->reg & 7) << 3);
-
-    // Shift rm to bits 2-0 (Mask with 7)
     modrm |= (inst->rm & 7);
 
     code[(*pos)++] = modrm;
   }
 
-  // ---------------------------------------------------------
-  // 4. PAYLOAD PHASE (Displacement & Immediate)
-  // ---------------------------------------------------------
+  // Memory offsets handling
   if (inst->use_disp) {
     // For now, assuming 8-bit displacement (signed char) as used in your stack
     code[(*pos)++] = (unsigned char)(inst->displacement & 0xFF);
   }
 
+  // Immediate values handling
   if (inst->use_imm) {
     if (inst->imm_size == 4) {
       // Use your existing helper for 32-bit numbers
