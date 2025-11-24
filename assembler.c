@@ -648,12 +648,18 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.reg = dst.reg_code;
           emit_instruction(code, pos, &i);
         } else {
-          if (dst.rex) {
-            emit_rex_byte(code, pos, 1, dst.rex);
-          }
-          code[(*pos)++] = 0x69;
-          code[(*pos)++] = 0xC0 + dst.reg_code * 9;
-          emitIntegerInHex(code, pos, idxVarc2);
+          dst = new_get_local_var_reg(idxVar);
+          i.opcode = 0x69;  // imul(l) imm32, r/m32
+          i.use_imm = 1;
+          i.imm_size = 4;  // 32 bits
+          i.immediate = idxVarc2;
+          i.isArithmOp = 1;
+          i.use_modrm = 1;
+          i.mod = 3;
+          // src and dst register are the same
+          i.rm = dst.reg_code;
+          i.reg = dst.reg_code;
+          emit_instruction(code, pos, &i);
         }
         break;
       }
