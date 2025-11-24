@@ -20,17 +20,12 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
                                       int idxVarc2);
 static void emit_cmp(unsigned char code[], int* pos, int varIndex);
 static void emit_jle(unsigned char code[], int* pos);
-static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
-                          char dst_rex);
-static inline void emit_mov(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 
 static RegInfo new_get_local_var_reg(int idx);
 static RegInfo get_local_var_reg(int idx);
 static RegInfo get_param_reg(int idx);
-
-static char shouldPrint = 0;
 
 /**
  * Receives an **open** file handle of the SBas file and
@@ -558,11 +553,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     arithmOp.rm = dst.reg_code;
     emit_instruction(code, pos, &arithmOp);
   } else if (varc2Prefix == '$') {
-    // printf("emitting 2nd instruction for arithm op for line: %s\n",
-    // lineBuffer);
-    char newPath = 1;
-    shouldPrint = 1;
-    RegInfo dst = get_local_var_reg(idxVar);
+    RegInfo dst = new_get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
 
     Instruction i = {0};
@@ -580,7 +571,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     switch (op) {
       case '+': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x83;  // add(b) imm8, r/m32
           i.use_imm = 1;
           i.imm_size = 1;  // 8 bits
@@ -592,7 +582,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
 
           emit_instruction(code, pos, &i);
         } else {
-          dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x81;  // add(l) imm32, r/m32
           i.use_imm = 1;
           i.imm_size = 4;  // 32 bits
@@ -607,7 +596,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
       }
       case '-': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x83;  // sub(b) imm8, r/m32
           i.use_imm = 1;
           i.imm_size = 1;  // 8 bits
@@ -619,7 +607,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.reg = 5;  // 101 in reg, indicating subtraction
           emit_instruction(code, pos, &i);
         } else {
-          dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x81;  // sub(l) imm32, r/m32
           i.use_imm = 1;
           i.imm_size = 4;  // 32 bits
@@ -635,7 +622,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
       }
       case '*': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x6B;  // imul(b) imm8, r/m32
           i.use_imm = 1;
           i.imm_size = 1;  // 8 bits
@@ -648,7 +634,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.reg = dst.reg_code;
           emit_instruction(code, pos, &i);
         } else {
-          dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x69;  // imul(l) imm32, r/m32
           i.use_imm = 1;
           i.imm_size = 4;  // 32 bits
@@ -669,7 +654,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         return;
       }
     }
-    shouldPrint = 0;
   }
 }
 
@@ -679,15 +663,18 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
  * as well as the jle conditional jump opcode
  */
 static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
-  RegInfo reg = get_local_var_reg(varIndex);
+  RegInfo reg = new_get_local_var_reg(varIndex);
   if (reg.reg_code == -1) return;
 
-  emit_rex_byte(code, pos, 0, reg.rex);
+  Instruction cmp = {0};
+  cmp.opcode = 0x83;  // arithm. op. with imm8
+  cmp.use_modrm = 1;
+  cmp.mod = 3;  // 11
+  cmp.reg = 7;  // 111 (cmp)
+  cmp.rm = reg.reg_code;
+  cmp.isCmp = 1;
 
-  // Emit `cmp $0, <reg>`
-  code[(*pos)++] = 0x83;
-  code[(*pos)++] = 0xF8 + reg.reg_code;
-  code[(*pos)++] = 0x00;
+  emit_instruction(code, pos, &cmp);
 }
 
 /**
@@ -771,7 +758,6 @@ static RegInfo new_get_local_var_reg(int idx) {
 /**
  * Returns the register where a parameter p1 through p3 is sent to a function
  * according to the System V ABI
- * Retorna o registrador associado a um parâmetro p1–p3.
  *
  * The `rex` field here is always zero because these registers are not extended.
  */
@@ -791,49 +777,6 @@ static RegInfo get_param_reg(int idx) {
       return (RegInfo){-1, -1};
   }
 }
-
-/**
- * Emits, if necessary, the prefix REX byte.
- * This is mandatory for accessing extended registers like r12d through r15d
- *
- * If `src_rex` is true, the bit 2, called R, is set, extending the
- * `reg` field in ModRM (source register).
- *
- * If `dst_rex` is true, the bit 0, called B, is set, extending the
- * `r/m` field in ModRM (target register).
- *
- * If both are true, both bits are sets and the corresponding fields are
- * extended
- */
-static void emit_rex_byte(unsigned char code[], int* pos, char src_rex,
-                          char dst_rex) {
-  unsigned char rex = 0x40;
-  char needsRex = 0;
-
-  if (src_rex) {
-    // REX byte with bit R set (for source register)
-    needsRex = 1;
-    rex |= 0x04;
-  }
-  if (dst_rex) {
-    // REX byte with bit B set (for target register)
-    needsRex = 1;
-    rex |= 0x01;
-  }
-
-  if (needsRex) {
-    code[(*pos)++] = rex;
-  }
-}
-
-/**
- * Emits `mov` instruction
- */
-static inline void emit_mov(unsigned char code[], int* pos) {
-  code[*pos] = 0x89;
-  (*pos)++;
-}
-
 
 /**
  * A x86-64 instruction is made of:
@@ -863,6 +806,11 @@ static void emit_instruction(unsigned char code[], int* pos,
 
   if (isSmallRet) {
     if (inst->small_ret_reg_src_id >= 4) {
+      rex |= 0x01;
+      needs_rex = 1;
+    }
+  } else if (inst->isCmp) {
+    if (inst->rm > 7) {
       rex |= 0x01;
       needs_rex = 1;
     }
@@ -929,5 +877,10 @@ static void emit_instruction(unsigned char code[], int* pos,
       // 8-bit immediate
       code[(*pos)++] = (unsigned char)(inst->immediate & 0xFF);
     }
+  }
+
+  // For now, support only iflez (compares against zero, so hardcode it)
+  if (inst->isCmp) {
+    code[(*pos)++] = 0x00;
   }
 }

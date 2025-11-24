@@ -68,6 +68,7 @@ typedef struct {
   int small_ret_reg_src_id;
 
   unsigned char isArithmOp;
+  unsigned char isCmp;
 } Instruction;
 
 #endif
