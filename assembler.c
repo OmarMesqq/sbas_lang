@@ -558,13 +558,15 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     arithmOp.rm = dst.reg_code;
     emit_instruction(code, pos, &arithmOp);
   } else if (varc2Prefix == '$') {
-    // printf("emitting 2nd instruction for arithm op for line: %s\n", lineBuffer);
+    // printf("emitting 2nd instruction for arithm op for line: %s\n",
+    // lineBuffer);
     char newPath = 1;
     shouldPrint = 1;
     RegInfo dst = get_local_var_reg(idxVar);
     if (dst.reg_code == -1) return;
 
     Instruction i = {0};
+    //TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg field
 
     /**
      * Emit operations.
@@ -578,7 +580,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x83;  // add(b) imm8, r/m32
           i.use_imm = 1;
-          i.imm_size = 1;   // 8 bits
+          i.imm_size = 1;  // 8 bits
           i.immediate = idxVarc2;
           i.isArithmOp = 1;
           i.use_modrm = 1;
@@ -590,7 +592,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           dst = new_get_local_var_reg(idxVar);
           i.opcode = 0x81;  // add(l) imm32, r/m32
           i.use_imm = 1;
-          i.imm_size = 4;   // 32 bits
+          i.imm_size = 4;  // 32 bits
           i.immediate = idxVarc2;
           i.isArithmOp = 1;
           i.use_modrm = 1;
@@ -601,17 +603,30 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         break;
       }
       case '-': {
-        if (dst.rex) {
-          emit_rex_byte(code, pos, 1, dst.rex);
-        }
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          code[(*pos)++] = 0x83;
-          code[(*pos)++] = 0xE8 + dst.reg_code;
-          code[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
+          dst = new_get_local_var_reg(idxVar);
+          i.opcode = 0x83;  // sub(b) imm8, r/m32
+          i.use_imm = 1;
+          i.imm_size = 1;  // 8 bits
+          i.immediate = idxVarc2;
+          i.isArithmOp = 1;
+          i.use_modrm = 1;
+          i.mod = 3;
+          i.rm = dst.reg_code;
+          i.reg = 5;  // 101 in reg, indicating subtraction
+          emit_instruction(code, pos, &i);
         } else {
-          code[(*pos)++] = 0x81;
-          code[(*pos)++] = 0xE8 + dst.reg_code;
-          emitIntegerInHex(code, pos, idxVarc2);
+          dst = new_get_local_var_reg(idxVar);
+          i.opcode = 0x81;  // sub(l) imm32, r/m32
+          i.use_imm = 1;
+          i.imm_size = 4;  // 32 bits
+          i.immediate = idxVarc2;
+          i.isArithmOp = 1;
+          i.use_modrm = 1;
+          i.mod = 3;
+          i.rm = dst.reg_code;
+          i.reg = 5;  // 101 in reg, indicating subtraction
+          emit_instruction(code, pos, &i);
         }
         break;
       }
@@ -630,10 +645,11 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         }
         break;
       }
-      default:
+      default: {
         fprintf(stderr, "emit_arithmetic_operation: invalid operation: %c\n",
                 op);
         return;
+      }
     }
     shouldPrint = 0;
   }
