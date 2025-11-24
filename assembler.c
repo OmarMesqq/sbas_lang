@@ -576,9 +576,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
       case '+': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
           dst = new_get_local_var_reg(idxVar);
-          i.opcode = 0x83;
+          i.opcode = 0x83;  // add(b) imm8, r/m32
           i.use_imm = 1;
-          i.imm_size = 1;
+          i.imm_size = 1;   // 8 bits
           i.immediate = idxVarc2;
           i.isArithmOp = 1;
           i.use_modrm = 1;
@@ -587,12 +587,16 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
 
           emit_instruction(code, pos, &i);
         } else {
-          if (dst.rex) {
-            emit_rex_byte(code, pos, 1, dst.rex);
-          }
-          code[(*pos)++] = 0x81;
-          code[(*pos)++] = 0xC0 + dst.reg_code;
-          emitIntegerInHex(code, pos, idxVarc2);
+          dst = new_get_local_var_reg(idxVar);
+          i.opcode = 0x81;  // add(l) imm32, r/m32
+          i.use_imm = 1;
+          i.imm_size = 4;   // 32 bits
+          i.immediate = idxVarc2;
+          i.isArithmOp = 1;
+          i.use_modrm = 1;
+          i.mod = 3;
+          i.rm = dst.reg_code;
+          emit_instruction(code, pos, &i);
         }
         break;
       }
