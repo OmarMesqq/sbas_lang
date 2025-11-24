@@ -743,7 +743,7 @@ static void emit_instruction(unsigned char code[], int* pos,
   if (inst->is_small_ret) {
     // Case: Opcode embedding (e.g. 0xB8 + reg)
     // We only need REX.B if the register index is 8-15 (r8-r15)
-    if (inst->small_ret_reg_src_id >= 7) {
+    if (inst->small_ret_reg_src_id > 7) {
       rex |= 0x01;  // REX.B
       needs_rex = 1;
     }
