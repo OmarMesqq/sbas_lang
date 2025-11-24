@@ -23,9 +23,9 @@ static void emit_jle(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 
-static RegInfo new_get_local_var_reg(int idx);
-static RegInfo get_local_var_reg(int idx);
-static RegInfo get_param_reg(int idx);
+static int new_get_local_var_reg(int idx);
+static int get_local_var_reg(int idx);
+static int get_param_reg(int idx);
 
 /**
  * Receives an **open** file handle of the SBas file and
@@ -361,8 +361,8 @@ static void emit_return(unsigned char code[], int* pos, char retType,
    * emits machine code for returning an SBas variable (v1 through v5)
    */
   if (retType == 'v') {
-    RegInfo reg = new_get_local_var_reg(returnValue);
-    if (reg.reg_code == -1) return;
+    int regCode = new_get_local_var_reg(returnValue);
+    if (regCode == -1) return;
 
     Instruction retVar = {0};
     retVar.opcode = 0x89;
@@ -370,7 +370,7 @@ static void emit_return(unsigned char code[], int* pos, char retType,
 
     retVar.use_modrm = 1;
     retVar.mod = 3;
-    retVar.reg = reg.reg_code;  // from a general purpose reg
+    retVar.reg = regCode;  // from a general purpose reg
     retVar.rm = 0;              // to eax
     emit_instruction(code, pos, &retVar);
   }
@@ -402,9 +402,9 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
                              char varpcPrefix, int idxVarpc) {
   // att var to var
   if (varpcPrefix == 'v') {
-    RegInfo src = new_get_local_var_reg(idxVarpc);
-    RegInfo dst = new_get_local_var_reg(idxVar);
-    if (src.reg_code == -1 || dst.reg_code == -1) return;
+    int srcRegCode = new_get_local_var_reg(idxVarpc);
+    int dstRegCode = new_get_local_var_reg(idxVar);
+    if (srcRegCode == -1 || dstRegCode == -1) return;
 
     Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0x89;  // standard move
@@ -412,35 +412,35 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar,
 
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
-    movReg2Reg.reg = src.reg_code;
-    movReg2Reg.rm = dst.reg_code;
+    movReg2Reg.reg = srcRegCode;
+    movReg2Reg.rm = dstRegCode;
 
     emit_instruction(code, pos, &movReg2Reg);
   }
   // att var param
   else if (varpcPrefix == 'p') {
-    RegInfo src = get_param_reg(idxVarpc);
-    RegInfo dst = new_get_local_var_reg(idxVar);
-    if (src.reg_code == -1 || dst.reg_code == -1) return;
+    int srcRegCode = get_param_reg(idxVarpc);
+    int dstRegCode = new_get_local_var_reg(idxVar);
+    if (srcRegCode == -1 || dstRegCode == -1) return;
 
     Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0x89;  // standard move
 
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
-    movReg2Reg.reg = src.reg_code;
-    movReg2Reg.rm = dst.reg_code;
+    movReg2Reg.reg = srcRegCode;
+    movReg2Reg.rm = dstRegCode;
     emit_instruction(code, pos, &movReg2Reg);
   }
   // att var imm
   else if (varpcPrefix == '$') {
-    RegInfo dst = get_local_var_reg(idxVar);
+    int dstRegCode = get_local_var_reg(idxVar);
 
     Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0xB8;  // imm move
 
     movReg2Reg.is_small_ret = 1;
-    movReg2Reg.small_ret_reg_src_id = dst.reg_code;
+    movReg2Reg.small_ret_reg_src_id = dstRegCode;
 
     movReg2Reg.use_imm = 1;
     movReg2Reg.imm_size = 4;
@@ -476,25 +476,25 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
    * mov <leftOperand>, <attributedVar>
    */
   if (varc1Prefix == 'v') {
-    RegInfo src = new_get_local_var_reg(idxVarc1);
-    RegInfo dst = new_get_local_var_reg(idxVar);
-    if (src.reg_code == -1 || dst.reg_code == -1) return;
+    int srcRegCode = new_get_local_var_reg(idxVarc1);
+    int dstRegCode = new_get_local_var_reg(idxVar);
+    if (srcRegCode == -1 || dstRegCode == -1) return;
 
     Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0x89;
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
-    movReg2Reg.reg = src.reg_code;
-    movReg2Reg.rm = dst.reg_code;
+    movReg2Reg.reg = srcRegCode;
+    movReg2Reg.rm = dstRegCode;
 
     emit_instruction(code, pos, &movReg2Reg);
   } else if (varc1Prefix == '$') {
-    RegInfo dst = get_local_var_reg(idxVar);
+    int dstRegCode = get_local_var_reg(idxVar);
     Instruction movReg2Reg = {0};
     movReg2Reg.opcode = 0xB8;  // imm move
 
     movReg2Reg.is_small_ret = 1;
-    movReg2Reg.small_ret_reg_src_id = dst.reg_code;
+    movReg2Reg.small_ret_reg_src_id = dstRegCode;
 
     movReg2Reg.use_imm = 1;
     movReg2Reg.imm_size = 4;
@@ -512,17 +512,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
    */
   if (varc2Prefix == 'v') {
     Instruction arithmOp = {0};
-    RegInfo src = new_get_local_var_reg(idxVarc2);
-    RegInfo dst = new_get_local_var_reg(idxVar);
-    if (src.reg_code == -1 || dst.reg_code == -1) return;
-
-    // Special case for multiplication: src and dst fields are swapped in REX
-    // byte
-    if (op == '*') {
-      char tmp = src.rex;
-      src.rex = dst.rex;
-      dst.rex = tmp;
-    }
+    int srcRegCode = new_get_local_var_reg(idxVarc2);
+    int dstRegCode = new_get_local_var_reg(idxVar);
+    if (srcRegCode == -1 || dstRegCode == -1) return;
 
     switch (op) {
       case '+':
@@ -542,25 +534,25 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
 
     // Special case for multiplication: reg and r/m are swapped in ModRM byte
     if (op == '*') {
-      int temp = dst.reg_code;
-      dst.reg_code = src.reg_code;
-      src.reg_code = temp;
+      int temp = dstRegCode;
+      dstRegCode = srcRegCode;
+      srcRegCode = temp;
     }
 
     arithmOp.use_modrm = 1;
     arithmOp.mod = 3;
-    arithmOp.reg = src.reg_code;
-    arithmOp.rm = dst.reg_code;
+    arithmOp.reg = srcRegCode;
+    arithmOp.rm = dstRegCode;
     emit_instruction(code, pos, &arithmOp);
   } else if (varc2Prefix == '$') {
-    RegInfo dst = new_get_local_var_reg(idxVar);
-    if (dst.reg_code == -1) return;
+    int dstRegCode = new_get_local_var_reg(idxVar);
+    if (dstRegCode == -1) return;
 
     Instruction i = {0};
     // TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg
     // field
-    // TODO: in small multiplication, code[(*pos)++] = dst.reg_code * 9; is
-    // equivalent to ((dst.reg_code << 3) | dst.reg_code)
+    // TODO: in small multiplication, code[(*pos)++] = dstRegCode * 9; is
+    // equivalent to ((dstRegCode << 3) | dstRegCode)
 
     /**
      * Emit operations.
@@ -578,7 +570,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.isArithmOp = 1;
           i.use_modrm = 1;
           i.mod = 3;
-          i.rm = dst.reg_code;
+          i.rm = dstRegCode;
 
           emit_instruction(code, pos, &i);
         } else {
@@ -589,7 +581,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.isArithmOp = 1;
           i.use_modrm = 1;
           i.mod = 3;
-          i.rm = dst.reg_code;
+          i.rm = dstRegCode;
           emit_instruction(code, pos, &i);
         }
         break;
@@ -603,7 +595,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.isArithmOp = 1;
           i.use_modrm = 1;
           i.mod = 3;
-          i.rm = dst.reg_code;
+          i.rm = dstRegCode;
           i.reg = 5;  // 101 in reg, indicating subtraction
           emit_instruction(code, pos, &i);
         } else {
@@ -614,7 +606,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.isArithmOp = 1;
           i.use_modrm = 1;
           i.mod = 3;
-          i.rm = dst.reg_code;
+          i.rm = dstRegCode;
           i.reg = 5;  // 101 in reg, indicating subtraction
           emit_instruction(code, pos, &i);
         }
@@ -630,8 +622,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.use_modrm = 1;
           i.mod = 3;
           // src and dst register are the same
-          i.rm = dst.reg_code;
-          i.reg = dst.reg_code;
+          i.rm = dstRegCode;
+          i.reg = dstRegCode;
           emit_instruction(code, pos, &i);
         } else {
           i.opcode = 0x69;  // imul(l) imm32, r/m32
@@ -642,8 +634,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
           i.use_modrm = 1;
           i.mod = 3;
           // src and dst register are the same
-          i.rm = dst.reg_code;
-          i.reg = dst.reg_code;
+          i.rm = dstRegCode;
+          i.reg = dstRegCode;
           emit_instruction(code, pos, &i);
         }
         break;
@@ -663,15 +655,15 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
  * as well as the jle conditional jump opcode
  */
 static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
-  RegInfo reg = new_get_local_var_reg(varIndex);
-  if (reg.reg_code == -1) return;
+  int regCode = new_get_local_var_reg(varIndex);
+  if (regCode == -1) return;
 
   Instruction cmp = {0};
   cmp.opcode = 0x83;  // arithm. op. with imm8
   cmp.use_modrm = 1;
   cmp.mod = 3;  // 11
   cmp.reg = 7;  // 111 (cmp)
-  cmp.rm = reg.reg_code;
+  cmp.rm = regCode;
   cmp.isCmp = 1;
 
   emit_instruction(code, pos, &cmp);
@@ -704,54 +696,54 @@ static void emit_jle(unsigned char code[], int* pos) {
  * target (`r/m`) of the operation in the ModRM byte, and, as such, will set the
  * REX.R or REX.B bits for source and target respectively.
  */
-static RegInfo get_local_var_reg(int idx) {
+static int get_local_var_reg(int idx) {
   switch (idx) {
     case 1:
       // v1 -> ebx
-      return (RegInfo){3, 0};
+      return 3;
     case 2:
       // v2 -> r12d
-      return (RegInfo){4, 1};
+      return 4;
     case 3:
       // v3 -> r13d
-      return (RegInfo){5, 1};
+      return 5;
     case 4:
       // v4 -> r14d
-      return (RegInfo){6, 1};
+      return 6;
     case 5:
       // v5 -> r15d
-      return (RegInfo){7, 1};
+      return 7;
     default:
       fprintf(stderr, "get_local_var_reg: invalid local variable index: v%d\n",
               idx);
-      return (RegInfo){-1, -1};
+      return -1;
   }
 }
 
 /**
  * Will be the new function to replace `get_local_var_reg`
  */
-static RegInfo new_get_local_var_reg(int idx) {
+static int new_get_local_var_reg(int idx) {
   switch (idx) {
     case 1:
       // v1 -> ebx
-      return (RegInfo){3, 0};
+      return 3;
     case 2:
       // v2 -> r12d
-      return (RegInfo){12, 1};
+      return 12;
     case 3:
       // v3 -> r13d
-      return (RegInfo){13, 1};
+      return 13;
     case 4:
       // v4 -> r14d
-      return (RegInfo){14, 1};
+      return 14;
     case 5:
       // v5 -> r15d
-      return (RegInfo){15, 1};
+      return 15;
     default:
       fprintf(stderr, "get_local_var_reg: invalid local variable index: v%d\n",
               idx);
-      return (RegInfo){-1, -1};
+      return -1;
   }
 }
 
@@ -761,20 +753,20 @@ static RegInfo new_get_local_var_reg(int idx) {
  *
  * The `rex` field here is always zero because these registers are not extended.
  */
-static RegInfo get_param_reg(int idx) {
+static int get_param_reg(int idx) {
   switch (idx) {
     case 1:
       // p1 -> edi
-      return (RegInfo){7, 0};
+      return 7;
     case 2:
       // p2 -> esi
-      return (RegInfo){6, 0};
+      return 6;
     case 3:
       // p3 -> edx
-      return (RegInfo){2, 0};
+      return 2;
     default:
       fprintf(stderr, "get_param_reg: invalid parameter index: p%d\n", idx);
-      return (RegInfo){-1, -1};
+      return -1;
   }
 }
 

@@ -34,19 +34,6 @@ typedef struct {
   unsigned char lineTarget;
 } RelocationTable;
 
-/**
- * Contains information about a x86-64 general purpose register.
- *
- * Fields:
- * - reg_code: numeric code for register (0–7).
- * - rex: boolean flag signaling the need for a REX prefix byte (used in
- * extended registers 8 through 15).
- */
-typedef struct {
-  int reg_code;
-  char rex;
-} RegInfo;
-
 typedef struct {
   unsigned int opcode;
 
