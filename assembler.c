@@ -566,7 +566,10 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
     if (dst.reg_code == -1) return;
 
     Instruction i = {0};
-    //TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg field
+    // TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg
+    // field
+    // TODO: in small multiplication, code[(*pos)++] = dst.reg_code * 9; is
+    // equivalent to ((dst.reg_code << 3) | dst.reg_code)
 
     /**
      * Emit operations.
@@ -631,14 +634,23 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos,
         break;
       }
       case '*': {
-        if (dst.rex) {
-          emit_rex_byte(code, pos, 1, dst.rex);
-        }
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          code[(*pos)++] = 0x6B;
-          code[(*pos)++] = 0xC0 + dst.reg_code * 9;
-          code[(*pos)++] = (unsigned char)(idxVarc2 & 0xFF);
+          dst = new_get_local_var_reg(idxVar);
+          i.opcode = 0x6B;  // imul(b) imm8, r/m32
+          i.use_imm = 1;
+          i.imm_size = 1;  // 8 bits
+          i.immediate = idxVarc2;
+          i.isArithmOp = 1;
+          i.use_modrm = 1;
+          i.mod = 3;
+          // src and dst register are the same
+          i.rm = dst.reg_code;
+          i.reg = dst.reg_code;
+          emit_instruction(code, pos, &i);
         } else {
+          if (dst.rex) {
+            emit_rex_byte(code, pos, 1, dst.rex);
+          }
           code[(*pos)++] = 0x69;
           code[(*pos)++] = 0xC0 + dst.reg_code * 9;
           emitIntegerInHex(code, pos, idxVarc2);
