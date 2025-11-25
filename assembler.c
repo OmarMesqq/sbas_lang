@@ -512,11 +512,15 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (dstRegCode == -1) return;
 
-    // TODO: in small multiplication, code[(*pos)++] = dstRegCode * 9; is equivalent to ((dstRegCode << 3) | dstRegCode)
-
+    arithmeticOperation.isArithmOp = 1;
+    arithmeticOperation.use_modrm = 1;
+    arithmeticOperation.mod = REGISTER_DIRECT;
+    arithmeticOperation.rm = dstRegCode;
+    arithmeticOperation.use_imm = 1;
+    arithmeticOperation.immediate = idxVarc2;
     /**
      * Emit arithmetic operations:
-     * the ifs are an optimization check - 
+     * the ifs are an optimization check -
      * if the operand in question fits in a byte (-128 to 127), emit imm8 instructions,
      * otherwise emit for imm32
      */
@@ -525,25 +529,12 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
           // add(b) imm8, r/m32
           arithmeticOperation.opcode = OP_IMM8_ARITHM_OP;
-          arithmeticOperation.isArithmOp = 1;
-          arithmeticOperation.use_modrm = 1;
-          arithmeticOperation.mod = REGISTER_DIRECT;
-          arithmeticOperation.rm = dstRegCode;
-          arithmeticOperation.use_imm = 1;
           arithmeticOperation.imm_size = 1;  // 8 bits
-          arithmeticOperation.immediate = idxVarc2;
-
           emit_instruction(code, pos, &arithmeticOperation);
         } else {
           // add(l) imm32, r/m32
           arithmeticOperation.opcode = OP_IMM32_ARITHM_OP;
-          arithmeticOperation.use_imm = 1;
           arithmeticOperation.imm_size = 4;  // 32 bits
-          arithmeticOperation.immediate = idxVarc2;
-          arithmeticOperation.isArithmOp = 1;
-          arithmeticOperation.use_modrm = 1;
-          arithmeticOperation.mod = REGISTER_DIRECT;
-          arithmeticOperation.rm = dstRegCode;
           emit_instruction(code, pos, &arithmeticOperation);
         }
         break;
@@ -552,26 +543,13 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
           // sub(b) imm8, r/m32
           arithmeticOperation.opcode = OP_IMM8_ARITHM_OP;
-          arithmeticOperation.isArithmOp = 1;
-          arithmeticOperation.use_modrm = 1;
-          arithmeticOperation.mod = REGISTER_DIRECT;
-          arithmeticOperation.rm = dstRegCode;
           arithmeticOperation.reg = 5;  // 101 in reg, indicating subtraction
-          arithmeticOperation.use_imm = 1;
           arithmeticOperation.imm_size = 1;  // 8 bits
-          arithmeticOperation.immediate = idxVarc2;
-
           emit_instruction(code, pos, &arithmeticOperation);
         } else {
           // sub(l) imm32, r/m32
           arithmeticOperation.opcode = OP_IMM32_ARITHM_OP;
-          arithmeticOperation.use_imm = 1;
           arithmeticOperation.imm_size = 4;  // 32 bits
-          arithmeticOperation.immediate = idxVarc2;
-          arithmeticOperation.isArithmOp = 1;
-          arithmeticOperation.use_modrm = 1;
-          arithmeticOperation.mod = REGISTER_DIRECT;
-          arithmeticOperation.rm = dstRegCode;
           arithmeticOperation.reg = 5;  // 101 in reg, indicating subtraction
           emit_instruction(code, pos, &arithmeticOperation);
         }
@@ -581,28 +559,14 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
           // imul(b) imm8, r/m32
           arithmeticOperation.opcode = OP_IMUL_RM_BY_BYTE_STORE_IN_REG;
-          arithmeticOperation.use_imm = 1;
           arithmeticOperation.imm_size = 1;  // 8 bits
-          arithmeticOperation.immediate = idxVarc2;
-          arithmeticOperation.isArithmOp = 1;
-          arithmeticOperation.use_modrm = 1;
-          arithmeticOperation.mod = REGISTER_DIRECT;
-          // src and dst register are the same
-          arithmeticOperation.rm = dstRegCode;
-          arithmeticOperation.reg = dstRegCode;
+          arithmeticOperation.reg = dstRegCode; // src and dst register are the same
           emit_instruction(code, pos, &arithmeticOperation);
         } else {
           // imul(l) imm32, r/m32
           arithmeticOperation.opcode = OP_IMUL_RM_BY_INT_STORE_IN_REG;
-          arithmeticOperation.use_imm = 1;
           arithmeticOperation.imm_size = 4;  // 32 bits
-          arithmeticOperation.immediate = idxVarc2;
-          arithmeticOperation.isArithmOp = 1;
-          arithmeticOperation.use_modrm = 1;
-          arithmeticOperation.mod = REGISTER_DIRECT;
-          // src and dst register are the same
-          arithmeticOperation.rm = dstRegCode;
-          arithmeticOperation.reg = dstRegCode;
+          arithmeticOperation.reg = dstRegCode; // src and dst register are the same
           emit_instruction(code, pos, &arithmeticOperation);
         }
         break;
@@ -612,7 +576,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         return;
       }
     }
-
   }
 }
 
