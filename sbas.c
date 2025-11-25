@@ -22,11 +22,10 @@ static int make_buffer_executable(void* ptr, size_t size);
 funcp sbasCompile(FILE* f) {
   char assembleRet = 0;        // result of SBas assembling to machine code
   char linkRet = 0;            // result of machine code fixup patching
-  int relocCount = 0;          //  lines with jump offsets
+  int relocCount = 0;          // lines with jump offsets
   unsigned char* code = NULL;  // buffer to write SBas logic
-  funcp result_func =
-      NULL;             // return result: `code` buffer casted to SBas function
-  int mprotectRes = 0;  // holds status of syscall to make buffer executable
+  funcp result_func = NULL;    // return result: `code` buffer casted to SBas function
+  int mprotectRes = 0;         // holds status of syscall to make buffer executable
   LineTable* lt = NULL;
   RelocationTable* rt = NULL;
 
@@ -44,8 +43,7 @@ funcp sbasCompile(FILE* f) {
   lt = calloc((MAX_LINES + 1), sizeof(LineTable));
   rt = calloc((MAX_LINES + 1), sizeof(RelocationTable));
   if (!lt || !rt) {
-    fprintf(stderr,
-            "sbasCompile: failed to alloc line and/or relocation table!\n");
+    fprintf(stderr, "sbasCompile: failed to alloc line and/or relocation table!\n");
     goto on_error;
   }
 
@@ -116,8 +114,7 @@ static void* alloc_writable_buffer(size_t size) {
   size_t pagesize = sysconf(_SC_PAGESIZE);
 
   size_t alloc_size = ((size + pagesize - 1) / pagesize) * pagesize;
-  void* ptr = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE,
-                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  void* ptr = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (ptr == MAP_FAILED) {
     fprintf(stderr, "alloc_writable_buffer: failed to mmap writable buffer.\n");
     return NULL;
@@ -135,9 +132,7 @@ static int make_buffer_executable(void* ptr, size_t size) {
 
   // change protection to R+X (drop Write)
   if (mprotect(ptr, alloc_size, PROT_READ | PROT_EXEC) != 0) {
-    fprintf(stderr,
-            "make_buffer_executable: failed to set buffer to R+X through "
-            "mprotect.\n");
+    fprintf(stderr, "make_buffer_executable: failed to set buffer to R+X through mprotect.\n");
     return -1;
   }
 

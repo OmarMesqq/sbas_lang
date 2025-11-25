@@ -13,12 +13,10 @@
  *
  * @returns 0 on success, -1 on failure
  */
-char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt,
-              int* relocCount) {
+char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relocCount) {
   for (int i = 0; i < *relocCount; i++) {
     if (lt[rt[i].lineTarget].line == 0) {
-      compilationError("sbasCompile: jump target is not an executable line",
-                       rt[i].lineTarget);
+      compilationError("sbasCompile: jump target is not an executable line", rt[i].lineTarget);
       return -1;
     }
 

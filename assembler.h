@@ -5,7 +5,6 @@
 
 #include "types.h"
 
-char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt,
-                  RelocationTable* rt, int* relocCount);
+char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* rt, int* relocCount);
 
 #endif

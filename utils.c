@@ -28,10 +28,7 @@ void trimLeadingSpaces(char* lineBuffer) {
   unsigned i = 0;
   while (*aux != '\0') {
 #ifdef DEBUG
-    printf(
-        "trimLeadingSpaces: setting lineBuffer[i = %d] (%c) to "
-        "lineBuffer[spaces + i = %d] (%c)\n",
-        i, lineBuffer[i], spaces + i, lineBuffer[spaces + i]);
+    printf("trimLeadingSpaces: setting lineBuffer[i = %d] (%c) to lineBuffer[spaces + i = %d] (%c)\n", i, lineBuffer[i], spaces + i, lineBuffer[spaces + i]);
 #endif
     // shifts the entire string to beginning, eliminating spaces
     lineBuffer[i] = lineBuffer[spaces + i];
@@ -74,8 +71,7 @@ int stringToInt(char* str) {
     str++;
   }
   while (*str != '\0') {
-    // subtract the value of the digit char from 0 in ASCII table, getting its
-    // true value
+    // subtract the value of the digit char from 0 in ASCII table, getting its true value
     digit = *str - '0';
     // each new digit "adds" another power of 10 to the overall number
     num *= 10;
@@ -138,8 +134,7 @@ void printRelocationTable(RelocationTable* rt, int relocCount) {
  * Prints a SBas compilation error `msg`, found at a given `line`, to `stderr`
  */
 void compilationError(const char* msg, int line) {
-  fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg,
-          RESET_COLOR);
+  fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg, RESET_COLOR);
 }
 
 /**
