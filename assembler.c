@@ -475,10 +475,14 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
    * <operation> <rightOperand>, <attributedVar>
    */
   Instruction arithmeticOperation = {0};
+  int dstRegCode = get_hardware_reg_index('v', idxVar);
+  if (dstRegCode == -1) return;
+
+  arithmeticOperation.use_modrm = 1;
+  arithmeticOperation.mod = REGISTER_DIRECT;
+
   if (varc2Prefix == 'v') {
     int srcRegCode = get_hardware_reg_index('v', idxVarc2);
-    int dstRegCode = get_hardware_reg_index('v', idxVar);
-    if (srcRegCode == -1 || dstRegCode == -1) return;
 
     switch (op) {
       case '+':
@@ -489,31 +493,21 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         break;
       case '*':
         arithmeticOperation.opcode = OP_IMUL_REG_BY_RM_STORE_IN_REG;
+        // Special case for reg to reg multiplication: reg and r/m are swapped in ModRM byte
+        int temp = dstRegCode;
+        dstRegCode = srcRegCode;
+        srcRegCode = temp;
         break;
       default:
         fprintf(stderr, "emit_arithmetic_operation: invalid operation: %c\n", op);
         return;
     }
 
-    // Special case for multiplication: reg and r/m are swapped in ModRM byte
-    if (op == '*') {
-      int temp = dstRegCode;
-      dstRegCode = srcRegCode;
-      srcRegCode = temp;
-    }
-
-    arithmeticOperation.use_modrm = 1;
-    arithmeticOperation.mod = REGISTER_DIRECT;
     arithmeticOperation.reg = srcRegCode;
     arithmeticOperation.rm = dstRegCode;
     emit_instruction(code, pos, &arithmeticOperation);
   } else if (varc2Prefix == '$') {
-    int dstRegCode = get_hardware_reg_index('v', idxVar);
-    if (dstRegCode == -1) return;
-
     arithmeticOperation.isArithmOp = 1;
-    arithmeticOperation.use_modrm = 1;
-    arithmeticOperation.mod = REGISTER_DIRECT;
     arithmeticOperation.rm = dstRegCode;
     arithmeticOperation.use_imm = 1;
     arithmeticOperation.immediate = idxVarc2;
@@ -525,7 +519,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
      * otherwise use the int one, emitting 6:
      * opcode, ModRM, imm, imm, imm, imm
      */
-    // use imm8 or imm32 depending on immediate's size
     int fitsInByte = (idxVarc2 >= -128 && idxVarc2 <= 127);
     arithmeticOperation.imm_size = fitsInByte ? 1 : 4;
 
