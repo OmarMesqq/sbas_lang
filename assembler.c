@@ -136,9 +136,9 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
       }
       case 'v': { /* attribution and arithmetic operation */
         int idxVar;
-        char operator;
+        char separator;
 
-        if (sscanf(lineBuffer, "v%d %c", &idxVar, &operator) != 2) {
+        if (sscanf(lineBuffer, "v%d %c", &idxVar, &separator) != 2) {
           compilationError("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
           return -1;
         }
@@ -149,14 +149,14 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
           return -1;
         }
 
-        if (operator != ':' && operator != '=') {
-          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", operator);
+        if (separator != ':' && separator != '=') {
+          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid operator %c. Only attribution (:) and arithmetic operation (=) are supported.", separator);
           compilationError(errorMsgBuffer, line);
           return -1;
         }
 
         // attribution
-        if (operator == ':') {
+        if (separator == ':') {
           char varpcPrefix;
           int idxVarpc;
           if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
@@ -166,7 +166,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
           emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
         }
         // arithmetic operation
-        else if (operator == '=') {
+        else if (separator == '=') {
           char varc1Prefix;
           int idxVarc1;
           char op;
