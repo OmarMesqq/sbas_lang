@@ -7,13 +7,28 @@
 
 #define BUFFER_SIZE 128  // length of a parsed line and of an error message
 
+/**
+ * A SBas operand such as:
+ * - variables (vX)
+ * - parameters (pX)
+ * - immediate values ($snum)
+ *
+ * Fields:
+ * - `type`: `v`, `p` or `$`
+ * - `value`: variable/parameter index (1..5) or an immediate value
+ */
+typedef struct {
+  char type;
+  int value;
+} Operand;
+
 static void emit_instruction(unsigned char code[], int* pos, Instruction* inst);
 static void emit_prologue(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
-static void emit_return(unsigned char code[], int* pos, char retType, int returnValue);
-static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc);
-static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2);
-static void emit_cmp(unsigned char code[], int* pos, int varIndex);
+static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol);
+static void emit_attribution(unsigned char code[], int* pos, Operand* dest, Operand* source);
+static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* dest, Operand* lhs, char op, Operand* rhs);
+static void emit_cmp(unsigned char code[], int* pos, Operand* op);
 static void emit_jle(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
@@ -105,8 +120,9 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
 
   while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
     trimLeadingSpaces(lineBuffer);
+    const char firstChar = lineBuffer[0];
 
-    if (lineBuffer[0] == ' ' || lineBuffer[0] == '\n' || lineBuffer[0] == '\0' || lineBuffer[0] == '/') {
+    if (firstChar == ' ' || firstChar == '\n' || firstChar == '\0' || firstChar == '/') {
       line++;
       continue;
     }
@@ -119,32 +135,31 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
     lt[line].line = line;
     lt[line].offset = pos;
 
-    switch (lineBuffer[0]) {
+    switch (firstChar) {
       case 'r': { /* return */
-        int varc;
-        char retType;  // 'v' for variable return, '$' for immediate value return
+        Operand returnSymbol = {0};
 
-        if (sscanf(lineBuffer, "ret %c%d", &retType, &varc) != 2 || (retType != 'v' && retType != '$')) {
+        if (sscanf(lineBuffer, "ret %c%d", &returnSymbol.type, &returnSymbol.value) != 2 || (returnSymbol.type != 'v' && returnSymbol.type != '$')) {
           compilationError("sbasCompile: invalid 'ret' command: expected 'ret <var|$int>", line);
           return -1;
         }
 
-        emit_return(code, &pos, retType, varc);
+        emit_return(code, &pos, &returnSymbol);
         if (!retFound) retFound = 1;
 
         break;
       }
       case 'v': { /* attribution and arithmetic operation */
-        int idxVar;
+        int destId;
         char separator;
 
-        if (sscanf(lineBuffer, "v%d %c", &idxVar, &separator) != 2) {
+        if (sscanf(lineBuffer, "v%d %c", &destId, &separator) != 2) {
           compilationError("sbasCompile: invalid command: expected attribution (vX: varpc) or arithmetic operation (vX = varc op varc)", line);
           return -1;
         }
 
-        if (idxVar < 1 || idxVar > 5) {
-          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", idxVar);
+        if (destId < 1 || destId > 5) {
+          snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid local variable index %d. Only v1 through v5 are allowed.", destId);
           compilationError(errorMsgBuffer, line);
           return -1;
         }
@@ -155,51 +170,56 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
           return -1;
         }
 
+        Operand dest = {
+            .type = firstChar,
+            .value = destId,
+        };
         // attribution
         if (separator == ':') {
-          char varpcPrefix;
-          int idxVarpc;
-          if (sscanf(lineBuffer, "v%d : %c%d", &idxVar, &varpcPrefix, &idxVarpc) != 3) {
+          Operand source = {0};
+
+          if (sscanf(lineBuffer, "v%d : %c%d", &destId, &source.type, &source.value) != 3) {
             compilationError("sbasCompile: invalid attribution: expected 'vX: <vX|pX|$num>'", line);
             return -1;
           }
-          emit_attribution(code, &pos, idxVar, varpcPrefix, idxVarpc);
+
+          emit_attribution(code, &pos, &dest, &source);
         }
         // arithmetic operation
         else if (separator == '=') {
-          char varc1Prefix;
-          int idxVarc1;
-          char op;
-          char varc2Prefix;
-          int idxVarc2;
+          Operand lhs, rhs = {0};
+          char operator;
           char remaining[BUFFER_SIZE] = {0};  // used in scanset to detect extra operands/operators
 
-          if (sscanf(lineBuffer, "v%d = %c%d %c %c%d %127[^\n]", &idxVar, &varc1Prefix, &idxVarc1, &op, &varc2Prefix, &idxVarc2, remaining) != 6) {
+          if (sscanf(lineBuffer, "v%d = %c%d %c %c%d %127[^\n]", &destId, &lhs.type, &lhs.value, &operator, &rhs.type, &rhs.value, remaining) != 6) {
             compilationError("sbasCompile: invalid arithmetic operation: expected 'vX = <vX|$num> op <vX|$num>'", line);
             return -1;
           }
 
-          if (op != '+' && op != '-' && op != '*') {
-            snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid arithmetic operation %c. Only addition (+), subtraction (-), and multiplication (*) allowed.", op);
+          if (operator != '+' && operator != '-' && operator != '*') {
+            snprintf(errorMsgBuffer, BUFFER_SIZE, "sbasCompile: invalid arithmetic operation %c. Only addition (+), subtraction (-), and multiplication (*) allowed.", operator);
             compilationError(errorMsgBuffer, line);
             return -1;
           }
 
-          emit_arithmetic_operation(code, &pos, idxVar, varc1Prefix, idxVarc1, op, varc2Prefix, idxVarc2);
+          emit_arithmetic_operation(code, &pos, &dest, &lhs, operator, &rhs);
         }
 
         break;
       }
       case 'i': { /* conditional jump */
-        int varIndex;
+        Operand op = {0};
+        int variableIndex;
         unsigned lineTarget;
 
-        if (sscanf(lineBuffer, "iflez v%d %u", &varIndex, &lineTarget) != 2) {
+        if (sscanf(lineBuffer, "iflez v%d %u", &variableIndex, &lineTarget) != 2) {
           compilationError("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
           return -1;
         }
 
-        emit_cmp(code, &pos, varIndex);
+        op.type = 'v';
+        op.value = variableIndex;
+        emit_cmp(code, &pos, &op);
         emit_jle(code, &pos);
 
         // Mark current line to be resolved in patching step
@@ -367,12 +387,12 @@ static void emit_epilogue(unsigned char code[], int* pos) {
   (*pos)++;
 }
 
-static void emit_return(unsigned char code[], int* pos, char retType, int returnValue) {
+static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol) {
   Instruction _return = {0};
 
   // local variable return (ret vX)
-  if (retType == 'v') {
-    int regCode = get_hardware_reg_index(retType, returnValue);
+  if (returnSymbol->type == 'v') {
+    int regCode = get_hardware_reg_index(returnSymbol->type, returnSymbol->value);
     if (regCode == -1) return;
 
     _return.opcode = OP_MOV_REG_TO_RM;
@@ -383,17 +403,17 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
     _return.rm = REG_RAX;
   }
   // constant literal return (ret $snum)
-  else if (retType == '$') {
+  else if (returnSymbol->type == '$') {
     _return.opcode = OP_MOV_IMM_TO_RD;
 
     _return.is_imm_mov = 1;
     _return.imm_mov_rd = REG_RAX;
 
     _return.use_imm = 1;
-    _return.immediate = returnValue;
+    _return.immediate = returnSymbol->value;
     _return.imm_size = 4;
   } else {
-    fprintf(stderr, "emit_return: invalid return type: %c\n", retType);
+    fprintf(stderr, "emit_return: invalid return type: %c\n", returnSymbol->type);
     return;
   }
   emit_instruction(code, pos, &_return);
@@ -405,16 +425,15 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
  * Emits machine code for a SBas attribution:
  * vX: <vX|pX|$num>
  */
-static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
+static void emit_attribution(unsigned char code[], int* pos, Operand* dest, Operand* source) {
   Instruction attribution = {0};
 
-  // target of an attribution is always a register
-  int dstRegCode = get_hardware_reg_index('v', idxVar);
+  int dstRegCode = get_hardware_reg_index(dest->type, dest->value);
   if (dstRegCode == -1) return;
 
   // var to var attribution (vX : vY) and param to var attribution (vX : pY)
-  if (varpcPrefix == 'v' || varpcPrefix == 'p') {
-    int srcRegCode = get_hardware_reg_index(varpcPrefix, idxVarpc);
+  if (source->type == 'v' || source->type == 'p') {
+    int srcRegCode = get_hardware_reg_index(source->type, source->value);
     attribution.opcode = OP_MOV_REG_TO_RM;
 
     attribution.use_modrm = 1;
@@ -423,7 +442,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     attribution.rm = dstRegCode;
   }
   // imm to var attribution (vX: $snum)
-  else if (varpcPrefix == '$') {
+  else if (source->type == '$') {
     attribution.opcode = OP_MOV_IMM_TO_RD;
 
     attribution.is_imm_mov = 1;
@@ -431,9 +450,9 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
 
     attribution.use_imm = 1;
     attribution.imm_size = 4;
-    attribution.immediate = idxVarpc;
+    attribution.immediate = source->value;
   } else {
-    fprintf(stderr, "emit_attribution: invalid attribution target: %c\n", varpcPrefix);
+    fprintf(stderr, "emit_attribution: invalid source for variable attribution: %c\n", source->type);
     return;
   }
   emit_instruction(code, pos, &attribution);
@@ -443,18 +462,12 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
  * Emit machine code for a SBas arithmetic operation:
  * vX = <vX | $num> op <vX | $num>
  */
-static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar, char varc1Prefix, int idxVarc1, char op, char varc2Prefix, int idxVarc2) {
-  /**
-   * For commutative operations, we swap the operands so we keep a single logic path
-   */
-  if ((op == '+' || op == '*') && varc1Prefix == '$' && varc2Prefix == 'v') {
-    char tmpPrefix = varc1Prefix;
-    int tmpIdx = idxVarc1;
-
-    varc1Prefix = varc2Prefix;
-    idxVarc1 = idxVarc2;
-    varc2Prefix = tmpPrefix;
-    idxVarc2 = tmpIdx;
+static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* dest, Operand* lhs, char op, Operand* rhs) {
+  // For commutative operations, we swap the operands so we keep a single logic path
+  if ((op == '+' || op == '*') && lhs->type == '$' && rhs->type == 'v') {
+    Operand* temp = lhs;
+    lhs = rhs;
+    rhs = temp;
   }
 
   /**
@@ -463,12 +476,11 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
    */
   Instruction mov = {0};
 
-  // target of an arithmetic operation is always a register
-  int dstRegCode = get_hardware_reg_index('v', idxVar);
+  int dstRegCode = get_hardware_reg_index(dest->type, dest->value);
   if (dstRegCode == -1) return;
 
-  if (varc1Prefix == 'v') {
-    int srcRegCode = get_hardware_reg_index(varc1Prefix, idxVarc1);
+  if (lhs->type == 'v') {
+    int srcRegCode = get_hardware_reg_index(lhs->type, lhs->value);
     if (srcRegCode == -1) return;
 
     mov.opcode = OP_MOV_REG_TO_RM;
@@ -477,7 +489,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     mov.mod = MOD_REGISTER_DIRECT;
     mov.reg = srcRegCode;
     mov.rm = dstRegCode;
-  } else if (varc1Prefix == '$') {
+  } else if (lhs->type == '$') {
     mov.opcode = OP_MOV_IMM_TO_RD;
 
     mov.is_imm_mov = 1;
@@ -485,9 +497,9 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     mov.use_imm = 1;
     mov.imm_size = 4;
-    mov.immediate = idxVarc1;
+    mov.immediate = lhs->value;
   } else {
-    fprintf(stderr, "emit_arithmetic_operation: invalid varc1Prefix: %c\n", varc1Prefix);
+    fprintf(stderr, "emit_arithmetic_operation: invalid LHS operand type: %c\n", lhs->type);
     return;
   }
   emit_instruction(code, pos, &mov);
@@ -500,8 +512,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
   arithmeticOperation.use_modrm = 1;
   arithmeticOperation.mod = MOD_REGISTER_DIRECT;
 
-  if (varc2Prefix == 'v') {
-    int srcRegCode = get_hardware_reg_index(varc2Prefix, idxVarc2);
+  if (rhs->type == 'v') {
+    int srcRegCode = get_hardware_reg_index(rhs->type, rhs->value);
 
     switch (op) {
       case '+':
@@ -524,11 +536,11 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     arithmeticOperation.reg = srcRegCode;
     arithmeticOperation.rm = dstRegCode;
-  } else if (varc2Prefix == '$') {
+  } else if (rhs->type == '$') {
     arithmeticOperation.isArithmOp = 1;
     arithmeticOperation.rm = dstRegCode;
     arithmeticOperation.use_imm = 1;
-    arithmeticOperation.immediate = idxVarc2;
+    arithmeticOperation.immediate = rhs->value;
 
     /**
      * A tiny optimization:
@@ -537,7 +549,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
      * otherwise use the int one, emitting 6:
      * opcode, ModRM, imm, imm, imm, imm
      */
-    int fitsInByte = (idxVarc2 >= -128 && idxVarc2 <= 127);
+    int fitsInByte = (rhs->value >= -128 && rhs->value <= 127);
     arithmeticOperation.imm_size = fitsInByte ? 1 : 4;
 
     switch (op) {
@@ -563,7 +575,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
       }
     }
   } else {
-    fprintf(stderr, "emit_arithmetic_operation: invalid varc2Prefix: %c\n", varc2Prefix);
+    fprintf(stderr, "emit_arithmetic_operation: invalid RHS operand type: %c\n", rhs->type);
     return;
   }
   emit_instruction(code, pos, &arithmeticOperation);
@@ -573,8 +585,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
  * Writes first instruction of a SBas conditional jump (`iflez`):
  * cmpl $0, <variableRegister>
  */
-static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
-  int regCode = get_hardware_reg_index('v', varIndex);
+static void emit_cmp(unsigned char code[], int* pos, Operand* op) {
+  int regCode = get_hardware_reg_index(op->type, op->value);
   if (regCode == -1) return;
 
   Instruction cmp = {0};
