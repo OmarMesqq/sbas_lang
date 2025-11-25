@@ -360,8 +360,8 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
   else if (retType == '$') {
     // mov(l) $imm32, %eax
     retVar.opcode = OP_MOV_FROM_IMM_TO_REG;
-    retVar.is_small_ret = 1;
-    retVar.small_ret_rd = 0;  // being explicit: eax's rd = 0
+    retVar.is_imm_mov = 1;
+    retVar.imm_mov_rd = 0;  // being explicit: eax's rd = 0
     retVar.use_imm = 1;
     retVar.immediate = returnValue;
     retVar.imm_size = 4;
@@ -413,8 +413,8 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
 
     movReg2Reg.opcode = OP_MOV_FROM_IMM_TO_REG;
 
-    movReg2Reg.is_small_ret = 1;
-    movReg2Reg.small_ret_rd = dstRegCode;
+    movReg2Reg.is_imm_mov = 1;
+    movReg2Reg.imm_mov_rd = dstRegCode;
 
     movReg2Reg.use_imm = 1;
     movReg2Reg.imm_size = 4;
@@ -463,8 +463,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     movReg2Reg.opcode = OP_MOV_FROM_IMM_TO_REG;
 
-    movReg2Reg.is_small_ret = 1;
-    movReg2Reg.small_ret_rd = dstRegCode;
+    movReg2Reg.is_imm_mov = 1;
+    movReg2Reg.imm_mov_rd = dstRegCode;
 
     movReg2Reg.use_imm = 1;
     movReg2Reg.imm_size = 4;
@@ -714,10 +714,10 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
     needs_rex = 1;
   }
 
-  if (inst->is_small_ret) {
+  if (inst->is_imm_mov) {
     // Case: Opcode embedding (e.g. 0xB8 + reg)
     // We only need REX.B if the register index is 8-15 (r8-r15)
-    if (inst->small_ret_rd > 7) {
+    if (inst->imm_mov_rd > 7) {
       rex |= 0x01;  // REX.B
       needs_rex = 1;
     }
@@ -753,8 +753,8 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
   } else {
     unsigned int combinedOpcode = inst->opcode;
 
-    if (inst->is_small_ret) {
-      combinedOpcode += (inst->small_ret_rd & 7);
+    if (inst->is_imm_mov) {
+      combinedOpcode += (inst->imm_mov_rd & 7);
     }
     code[(*pos)++] = (unsigned char)combinedOpcode;
   }

@@ -51,8 +51,9 @@ typedef struct {
   int immediate;           // 10, 100, etc.
   unsigned char imm_size;  // 1 or 4 bytes
 
-  unsigned char is_small_ret;  // for the optimized mov instruction
-  int small_ret_rd;
+  // mov imm32/64, r32/64 condenses the register id (rd) inside the opcode
+  unsigned char is_imm_mov;
+  int imm_mov_rd;
 
   unsigned char isArithmOp;
   unsigned char isCmp;
