@@ -462,18 +462,22 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
    * mov <leftOperand>, <attributedVar>
    */
   Instruction mov = {0};
+
+  // target of arithmetic operation is always a register
+  int dstRegCode = get_hardware_reg_index('v', idxVar);
+  if (dstRegCode == -1) return;
+
   if (varc1Prefix == 'v') {
     int srcRegCode = get_hardware_reg_index('v', idxVarc1);
-    int dstRegCode = get_hardware_reg_index('v', idxVar);
-    if (srcRegCode == -1 || dstRegCode == -1) return;
+    if (srcRegCode == -1) return;
 
     mov.opcode = OP_MOV_REG_TO_RM;
+
     mov.use_modrm = 1;
     mov.mod = MOD_REGISTER_DIRECT;
     mov.reg = srcRegCode;
     mov.rm = dstRegCode;
   } else if (varc1Prefix == '$') {
-    int dstRegCode = get_hardware_reg_index('v', idxVar);
     mov.opcode = OP_MOV_IMM_TO_RD;
 
     mov.is_imm_mov = 1;
@@ -495,9 +499,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
   Instruction arithmeticOperation = {0};
   arithmeticOperation.use_modrm = 1;
   arithmeticOperation.mod = MOD_REGISTER_DIRECT;
-
-  int dstRegCode = get_hardware_reg_index('v', idxVar);
-  if (dstRegCode == -1) return;
 
   if (varc2Prefix == 'v') {
     int srcRegCode = get_hardware_reg_index('v', idxVarc2);
@@ -523,7 +524,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     arithmeticOperation.reg = srcRegCode;
     arithmeticOperation.rm = dstRegCode;
-    emit_instruction(code, pos, &arithmeticOperation);
   } else if (varc2Prefix == '$') {
     arithmeticOperation.isArithmOp = 1;
     arithmeticOperation.rm = dstRegCode;
@@ -562,8 +562,11 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         return;
       }
     }
-    emit_instruction(code, pos, &arithmeticOperation);
+  } else {
+    fprintf(stderr, "emit_arithmetic_operation: invalid varc2Prefix: %c\n", varc2Prefix);
+    return;
   }
+  emit_instruction(code, pos, &arithmeticOperation);
 }
 
 /**
