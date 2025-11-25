@@ -19,12 +19,14 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 static int get_hardware_reg_index(char type, int idx);
 
+// TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg field
 typedef enum {
   OP_SAVE_BASE_PTR_IN_STACK_FRAME = 0x55,               // pushq %rbp
   OP_MOV_FROM_REG_TO_RM = 0x89,                         // move r32/64 to r/m 32/64
   OP_MOV_FROM_RM_TO_REG = 0x8B,                         // move r/m 32/64 to r32/64
   OP_MOV_FROM_IMM_TO_REG = 0xB8,                        // move imm32/64 to r32/64 (requires rd embedded in opcode)
   OP_IMM8_ARITHM_OP = 0x83,                             // arithmetic operation with byte immediate
+  OP_IMM32_ARITHM_OP = 0x81,                            // arithmetic operation with int immediate
   OP_ADD_REG_TO_RM = 0x01,                              // add r32/64 to r/m 32/64
   OP_SUB_REG_FROM_RM = 0x29,                            // subtract r32/64 from r/m 32/64
   OP_IMUL_REG_BY_RM_STORE_IN_REG = (0x0F << 8) | 0xAF,  // multiply r/m 32/64 by r32/64 and store in r32/64 (r32/64 := r/m 32/64 * r32/64 )
@@ -242,8 +244,8 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   sub.reg = 5;  // 5 = Opcode Extension for SUB
   sub.rm = 4;   // 4 = RSP Register ID
   sub.use_imm = 1;
-  sub.imm_size = 1;    // 1 byte immediate
-  sub.immediate = 48;  // Value 48
+  sub.imm_size = 1;  // 1 byte immediate
+  sub.immediate = 48;
   emit_instruction(code, pos, &sub);
 
   // 2. Save Registers to Stack
@@ -253,8 +255,8 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   mov.is_64bit = 1;  // REX.W
   mov.use_modrm = 1;
   mov.mod = BASE_PLUS_DISP8;
-  mov.rm = 5;        // Destination Base is RBP (ID 5)
-  mov.use_disp = 1;  // We are using a displacement
+  mov.rm = 5;  // Destination Base is RBP (ID 5)
+  mov.use_disp = 1;
 
   // Save RBX at -8: movq %rbx, -8(%rbp)
   mov.reg = 3;  // Source Register
@@ -292,8 +294,8 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   mov.is_64bit = 1;  // REX.W
   mov.use_modrm = 1;
   mov.mod = BASE_PLUS_DISP8;
-  mov.rm = 5;        // Source Base is RBP (ID 5)
-  mov.use_disp = 1;  // We are using a displacement
+  mov.rm = 5;  // Source Base is RBP (ID 5)
+  mov.use_disp = 1;
 
   // Restore RBX (ID 3) from -8
   mov.reg = 3;  // Destination Register
@@ -325,11 +327,9 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos) {
  * Undoes the current stack frame: emits leave and ret
  */
 static void emit_epilogue(unsigned char code[], int* pos) {
-  // leave
   code[*pos] = OP_LEAVE;
   (*pos)++;
 
-  // ret
   code[*pos] = OP_RET;
   (*pos)++;
 }
@@ -516,7 +516,6 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (dstRegCode == -1) return;
 
-    // TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg field
     // TODO: in small multiplication, code[(*pos)++] = dstRegCode * 9; is equivalent to ((dstRegCode << 3) | dstRegCode)
 
     /**
@@ -528,7 +527,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     switch (op) {
       case '+': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          arithmOp.opcode = OP_IMM8_ARITHM_OP;  // add(b) imm8, r/m32
+          // add(b) imm8, r/m32
+          arithmOp.opcode = OP_IMM8_ARITHM_OP;
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
           arithmOp.mod = REGISTER_DIRECT;
@@ -539,7 +539,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
           emit_instruction(code, pos, &arithmOp);
         } else {
-          arithmOp.opcode = 0x81;  // add(l) imm32, r/m32
+          // add(l) imm32, r/m32
+          arithmOp.opcode = OP_IMM32_ARITHM_OP;
           arithmOp.use_imm = 1;
           arithmOp.imm_size = 4;  // 32 bits
           arithmOp.immediate = idxVarc2;
@@ -553,7 +554,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
       }
       case '-': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          arithmOp.opcode = OP_IMM8_ARITHM_OP;  // sub(b) imm8, r/m32
+          // sub(b) imm8, r/m32
+          arithmOp.opcode = OP_IMM8_ARITHM_OP;
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
           arithmOp.mod = REGISTER_DIRECT;
@@ -565,7 +567,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
           emit_instruction(code, pos, &arithmOp);
         } else {
-          arithmOp.opcode = 0x81;  // sub(l) imm32, r/m32
+          // sub(l) imm32, r/m32
+          arithmOp.opcode = OP_IMM32_ARITHM_OP;
           arithmOp.use_imm = 1;
           arithmOp.imm_size = 4;  // 32 bits
           arithmOp.immediate = idxVarc2;
@@ -580,7 +583,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
       }
       case '*': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          arithmOp.opcode = OP_IMUL_RM_BY_BYTE_STORE_IN_REG;  // imul(b) imm8, r/m32
+          // imul(b) imm8, r/m32
+          arithmOp.opcode = OP_IMUL_RM_BY_BYTE_STORE_IN_REG;
           arithmOp.use_imm = 1;
           arithmOp.imm_size = 1;  // 8 bits
           arithmOp.immediate = idxVarc2;
@@ -592,7 +596,8 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.reg = dstRegCode;
           emit_instruction(code, pos, &arithmOp);
         } else {
-          arithmOp.opcode = OP_IMUL_RM_BY_INT_STORE_IN_REG;  // imul(l) imm32, r/m32
+          // imul(l) imm32, r/m32
+          arithmOp.opcode = OP_IMUL_RM_BY_INT_STORE_IN_REG;
           arithmOp.use_imm = 1;
           arithmOp.imm_size = 4;  // 32 bits
           arithmOp.immediate = idxVarc2;
