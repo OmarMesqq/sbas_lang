@@ -34,6 +34,14 @@ typedef enum {
   OP_RET = 0xc3,
 } Opcode;
 
+typedef enum {
+  // (11) Both operands are registers. Used for variables
+  REGISTER_DIRECT = 3,
+
+  // (01) Memory access at [register + signed byte]. Used for stack frame offsets
+  BASE_PLUS_DISP8 = 1,
+} Mod;
+
 /**
  * Receives an **open** file handle of the SBas file and
  * attempts to write corresponding logic in x86-64 machine code to a buffer
@@ -206,7 +214,7 @@ static void emit_prologue(unsigned char code[], int* pos) {
   initStackFrame.is_64bit = 1;
 
   initStackFrame.use_modrm = 1;
-  initStackFrame.mod = 3;  // between registers
+  initStackFrame.mod = REGISTER_DIRECT;
   initStackFrame.reg = 4;  // from rsp
   initStackFrame.rm = 5;   // to rbp
 
@@ -230,7 +238,7 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   sub.opcode = OP_IMM8_ARITHM_OP;
   sub.is_64bit = 1;
   sub.use_modrm = 1;
-  sub.mod = 3;  // 11 = Register Direct Mode
+  sub.mod = REGISTER_DIRECT;
   sub.reg = 5;  // 5 = Opcode Extension for SUB
   sub.rm = 4;   // 4 = RSP Register ID
   sub.use_imm = 1;
@@ -244,7 +252,7 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   mov.opcode = OP_MOV_FROM_REG_TO_RM;
   mov.is_64bit = 1;  // REX.W
   mov.use_modrm = 1;
-  mov.mod = 1;       // 01 = Memory + Byte Displacement
+  mov.mod = BASE_PLUS_DISP8;
   mov.rm = 5;        // Destination Base is RBP (ID 5)
   mov.use_disp = 1;  // We are using a displacement
 
@@ -283,7 +291,7 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   mov.opcode = OP_MOV_FROM_RM_TO_REG;
   mov.is_64bit = 1;  // REX.W
   mov.use_modrm = 1;
-  mov.mod = 1;       // 01 = Memory + Byte Displacement
+  mov.mod = BASE_PLUS_DISP8;
   mov.rm = 5;        // Source Base is RBP (ID 5)
   mov.use_disp = 1;  // We are using a displacement
 
@@ -340,7 +348,7 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
     retVar.is_64bit = 1;
 
     retVar.use_modrm = 1;
-    retVar.mod = 3;
+    retVar.mod = REGISTER_DIRECT;
     retVar.reg = regCode;  // from a general purpose reg
     retVar.rm = 0;         // to eax
     emit_instruction(code, pos, &retVar);
@@ -379,7 +387,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     movReg2Reg.is_64bit = 1;  // except for v1, v2-v5 are extended registers
 
     movReg2Reg.use_modrm = 1;
-    movReg2Reg.mod = 3;
+    movReg2Reg.mod = REGISTER_DIRECT;
     movReg2Reg.reg = srcRegCode;
     movReg2Reg.rm = dstRegCode;
 
@@ -394,7 +402,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     movReg2Reg.opcode = OP_MOV_FROM_REG_TO_RM;
 
     movReg2Reg.use_modrm = 1;
-    movReg2Reg.mod = 3;
+    movReg2Reg.mod = REGISTER_DIRECT;
     movReg2Reg.reg = srcRegCode;
     movReg2Reg.rm = dstRegCode;
     emit_instruction(code, pos, &movReg2Reg);
@@ -446,7 +454,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     movReg2Reg.opcode = OP_MOV_FROM_REG_TO_RM;
     movReg2Reg.use_modrm = 1;
-    movReg2Reg.mod = 3;
+    movReg2Reg.mod = REGISTER_DIRECT;
     movReg2Reg.reg = srcRegCode;
     movReg2Reg.rm = dstRegCode;
 
@@ -500,7 +508,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     }
 
     arithmOp.use_modrm = 1;
-    arithmOp.mod = 3;
+    arithmOp.mod = REGISTER_DIRECT;
     arithmOp.reg = srcRegCode;
     arithmOp.rm = dstRegCode;
     emit_instruction(code, pos, &arithmOp);
@@ -523,7 +531,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.opcode = OP_IMM8_ARITHM_OP;  // add(b) imm8, r/m32
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
-          arithmOp.mod = 3;
+          arithmOp.mod = REGISTER_DIRECT;
           arithmOp.rm = dstRegCode;
           arithmOp.use_imm = 1;
           arithmOp.imm_size = 1;  // 8 bits
@@ -537,7 +545,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.immediate = idxVarc2;
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
-          arithmOp.mod = 3;
+          arithmOp.mod = REGISTER_DIRECT;
           arithmOp.rm = dstRegCode;
           emit_instruction(code, pos, &arithmOp);
         }
@@ -548,7 +556,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.opcode = OP_IMM8_ARITHM_OP;  // sub(b) imm8, r/m32
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
-          arithmOp.mod = 3;
+          arithmOp.mod = REGISTER_DIRECT;
           arithmOp.rm = dstRegCode;
           arithmOp.reg = 5;  // 101 in reg, indicating subtraction
           arithmOp.use_imm = 1;
@@ -563,7 +571,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.immediate = idxVarc2;
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
-          arithmOp.mod = 3;
+          arithmOp.mod = REGISTER_DIRECT;
           arithmOp.rm = dstRegCode;
           arithmOp.reg = 5;  // 101 in reg, indicating subtraction
           emit_instruction(code, pos, &arithmOp);
@@ -578,7 +586,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.immediate = idxVarc2;
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
-          arithmOp.mod = 3;
+          arithmOp.mod = REGISTER_DIRECT;
           // src and dst register are the same
           arithmOp.rm = dstRegCode;
           arithmOp.reg = dstRegCode;
@@ -590,7 +598,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.immediate = idxVarc2;
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
-          arithmOp.mod = 3;
+          arithmOp.mod = REGISTER_DIRECT;
           // src and dst register are the same
           arithmOp.rm = dstRegCode;
           arithmOp.reg = dstRegCode;
@@ -618,7 +626,7 @@ static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
   Instruction cmp = {0};
   cmp.opcode = OP_IMM8_ARITHM_OP;
   cmp.use_modrm = 1;
-  cmp.mod = 3;  // 11
+  cmp.mod = REGISTER_DIRECT;
   cmp.reg = 7;  // 111 (cmp)
   cmp.rm = regCode;
   cmp.isCmp = 1;

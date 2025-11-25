@@ -40,7 +40,7 @@ typedef struct {
   unsigned char is_64bit;
 
   unsigned char use_modrm;
-  unsigned char mod;  // operation between which operands?
+  unsigned char mod;  // specifies addressing mode
   unsigned char reg;  // source
   unsigned char rm;   // destination
 
