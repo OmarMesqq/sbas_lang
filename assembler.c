@@ -369,38 +369,35 @@ static void emit_epilogue(unsigned char code[], int* pos) {
 }
 
 static void emit_return(unsigned char code[], int* pos, char retType, int returnValue) {
-  Instruction retVar = {0};
-  /**
-   * local variable return (ret vX):
-   * emits machine code for returning an SBas variable (v1 through v5)
-   */
+  Instruction _return = {0};
+
+  // local variable return (ret vX)
   if (retType == 'v') {
     int regCode = get_hardware_reg_index('v', returnValue);
     if (regCode == -1) return;
 
-    retVar.opcode = OP_MOV_REG_TO_RM;
+    _return.opcode = OP_MOV_REG_TO_RM;
 
-    retVar.use_modrm = 1;
-    retVar.mod = MOD_REGISTER_DIRECT;
-    retVar.reg = regCode;
-    retVar.rm = REG_RAX;
-    emit_instruction(code, pos, &retVar);
+    _return.use_modrm = 1;
+    _return.mod = MOD_REGISTER_DIRECT;
+    _return.reg = regCode;
+    _return.rm = REG_RAX;
   }
-  /**
-   * constant literal return (ret $snum):
-   * emits machine code for returning an immediate value (movl $imm32, %eax)
-   */
+  // constant literal return (ret $snum)
   else if (retType == '$') {
-    retVar.opcode = OP_MOV_IMM_TO_RD;
+    _return.opcode = OP_MOV_IMM_TO_RD;
 
-    retVar.is_imm_mov = 1;
-    retVar.imm_mov_rd = REG_RAX;
+    _return.is_imm_mov = 1;
+    _return.imm_mov_rd = REG_RAX;
 
-    retVar.use_imm = 1;
-    retVar.immediate = returnValue;
-    retVar.imm_size = 4;
-    emit_instruction(code, pos, &retVar);
+    _return.use_imm = 1;
+    _return.immediate = returnValue;
+    _return.imm_size = 4;
+  } else {
+    fprintf(stderr, "emit_return: invalid return type: %c\n", retType);
+    return;
   }
+  emit_instruction(code, pos, &_return);
   restore_callee_saved_registers(code, pos);
   emit_epilogue(code, pos);
 }
@@ -411,39 +408,22 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
  */
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
   Instruction attribution = {0};
-  //  att var to var
-  if (varpcPrefix == 'v') {
-    int srcRegCode = get_hardware_reg_index('v', idxVarpc);
-    int dstRegCode = get_hardware_reg_index('v', idxVar);
-    if (srcRegCode == -1 || dstRegCode == -1) return;
 
+  int dstRegCode = get_hardware_reg_index('v', idxVar);
+  if (dstRegCode == -1) return;
+
+  // var to var attribution (vX : vY) and param to var attribution (vX : pY)
+  if (varpcPrefix == 'v' || varpcPrefix == 'p') {
+    int srcRegCode = get_hardware_reg_index(varpcPrefix, idxVarpc);
     attribution.opcode = OP_MOV_REG_TO_RM;
 
     attribution.use_modrm = 1;
     attribution.mod = MOD_REGISTER_DIRECT;
     attribution.reg = srcRegCode;
     attribution.rm = dstRegCode;
-
-    emit_instruction(code, pos, &attribution);
   }
-  // att var param
-  else if (varpcPrefix == 'p') {
-    int srcRegCode = get_hardware_reg_index('p', idxVarpc);
-    int dstRegCode = get_hardware_reg_index('v', idxVar);
-    if (srcRegCode == -1 || dstRegCode == -1) return;
-
-    attribution.opcode = OP_MOV_REG_TO_RM;
-
-    attribution.use_modrm = 1;
-    attribution.mod = MOD_REGISTER_DIRECT;
-    attribution.reg = srcRegCode;
-    attribution.rm = dstRegCode;
-    emit_instruction(code, pos, &attribution);
-  }
-  // att var imm
+  // imm to var attribution (vX: $snum)
   else if (varpcPrefix == '$') {
-    int dstRegCode = get_hardware_reg_index('v', idxVar);
-
     attribution.opcode = OP_MOV_IMM_TO_RD;
 
     attribution.is_imm_mov = 1;
@@ -452,8 +432,11 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     attribution.use_imm = 1;
     attribution.imm_size = 4;
     attribution.immediate = idxVarpc;
-    emit_instruction(code, pos, &attribution);
+  } else {
+    fprintf(stderr, "emit_attribution: invalid attribution target: %c\n", varpcPrefix);
+    return;
   }
+  emit_instruction(code, pos, &attribution);
 }
 
 /**
