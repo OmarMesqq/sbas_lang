@@ -21,9 +21,9 @@ static int get_hardware_reg_index(char type, int idx);
 
 typedef enum {
   OP_SAVE_BASE_PTR_IN_STACK_FRAME = 0x55,               // pushq %rbp
-  OP_MOV_FROM_REG_TO_RM = 0x89,                         // move r32/64 to r/m 32/64
-  OP_MOV_FROM_RM_TO_REG = 0x8B,                         // move r/m 32/64 to r32/64
-  OP_MOV_FROM_IMM_TO_REG = 0xB8,                        // move imm32/64 to r32/64 (requires rd embedded in opcode)
+  OP_MOV_REG_TO_RM = 0x89,                              // move r32/64 to r/m 32/64
+  OP_MOV_RM_TO_REG = 0x8B,                              // move r/m 32/64 to r32/64
+  OP_MOV_IMM_TO_RD = 0xB8,                              // move imm32/64 to r32/64 (requires register id `rd` embedded in opcode)
   OP_IMM8_ARITHM_OP = 0x83,                             // arithmetic operation with byte immediate
   OP_IMM32_ARITHM_OP = 0x81,                            // arithmetic operation with int immediate
   OP_ADD_REG_TO_RM = 0x01,                              // add r32/64 to r/m 32/64
@@ -35,13 +35,51 @@ typedef enum {
   OP_RET = 0xc3,
 } Opcode;
 
+/**
+ * Defines the two addressing modes used by the SBas compiler
+ * that go into the `mod` field of the ModRM byte i.e.
+ * bits 7 and 6 of the latter
+ */
 typedef enum {
   // (11) Both operands are registers. Used for variables
-  REGISTER_DIRECT = 3,
+  MOD_REGISTER_DIRECT = 3,
 
-  // (01) Memory access at [register + signed byte]. Used for stack frame offsets
-  BASE_PLUS_DISP8 = 1,
+  // (01) Memory access: (register + signed byte). Used for stack frame offsets
+  MOD_REG_PLUS_DISP8 = 1,
 } Mod;
+
+/**
+ * Single source of truth for getting x86-64's (messy) register IDs
+ */
+typedef enum {
+  REG_RAX = 0,   // caller-saved: return register
+  REG_RCX = 1,   // caller-saved: 4th argument in System V ABI
+  REG_RDX = 2,   // caller-saved: 3rd argument in System V ABI
+  REG_RBX = 3,   // callee-saved: general purpose
+  REG_RSP = 4,   // stack pointer
+  REG_RBP = 5,   // frame or base pointer
+  REG_RSI = 6,   // caller-saved: 2nd argument in System V ABI
+  REG_RDI = 7,   // caller-saved: 1st argument in System V ABI
+  REG_R8 = 8,    // caller-saved: 5th argument in System V ABI
+  REG_R9 = 9,    // caller-saved: 6th argument in System V ABI
+  REG_R10 = 10,  // caller-saved: general purpose
+  REG_R11 = 11,  // caller-saved: general purpose
+  REG_R12 = 12,  // callee-saved: general purpose
+  REG_R13 = 13,  // callee-saved: general purpose
+  REG_R14 = 14,  // callee-saved: general purpose
+  REG_R15 = 15   // callee-saved: general purpose
+} Register;
+
+/**
+ * Opcodes that perform arithmetic operations on immediates form a sort
+ * of "base" opcode group that specializes by tuning bits in the `reg` field
+ * of ModRM
+ */
+typedef enum {
+  EXT_ADD = 0,
+  EXT_SUB = 5,  // 101
+  EXT_CMP = 7   // 111
+} OpcodeExtension;
 
 /**
  * Receives an **open** file handle of the SBas file and
@@ -211,13 +249,13 @@ static void emit_prologue(unsigned char code[], int* pos) {
 
   // movq %rsp, %rbp
   Instruction initializeStackPtr = {0};
-  initializeStackPtr.opcode = OP_MOV_FROM_REG_TO_RM;
+  initializeStackPtr.opcode = OP_MOV_REG_TO_RM;
   initializeStackPtr.is_64bit = 1;
 
   initializeStackPtr.use_modrm = 1;
-  initializeStackPtr.mod = REGISTER_DIRECT;
-  initializeStackPtr.reg = 4;  // from rsp
-  initializeStackPtr.rm = 5;   // to rbp
+  initializeStackPtr.mod = MOD_REGISTER_DIRECT;
+  initializeStackPtr.reg = REG_RSP;
+  initializeStackPtr.rm = REG_RBP;
 
   emit_instruction(code, pos, &initializeStackPtr);
 }
@@ -239,44 +277,44 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   decrementStackPtr.opcode = OP_IMM8_ARITHM_OP;
   decrementStackPtr.is_64bit = 1;
   decrementStackPtr.use_modrm = 1;
-  decrementStackPtr.mod = REGISTER_DIRECT;
-  decrementStackPtr.reg = 5;  // 5 = Opcode Extension for SUB
-  decrementStackPtr.rm = 4;   // 4 = RSP Register ID
+  decrementStackPtr.mod = MOD_REGISTER_DIRECT;
+  decrementStackPtr.reg = EXT_SUB;
+  decrementStackPtr.rm = REG_RSP;
   decrementStackPtr.use_imm = 1;
-  decrementStackPtr.imm_size = 1;  // 1 byte immediate
+  decrementStackPtr.imm_size = 1;
   decrementStackPtr.immediate = 48;
   emit_instruction(code, pos, &decrementStackPtr);
 
   Instruction movRegToStack = {0};
-  movRegToStack.opcode = OP_MOV_FROM_REG_TO_RM;
-  movRegToStack.is_64bit = 1;  // REX.W
-  movRegToStack.use_modrm = 1;
-  movRegToStack.mod = BASE_PLUS_DISP8;
-  movRegToStack.rm = 5;  // Destination Base is RBP (ID 5)
+  movRegToStack.opcode = OP_MOV_REG_TO_RM;
+  movRegToStack.is_64bit = 1;
   movRegToStack.use_disp = 1;
+  movRegToStack.use_modrm = 1;
+  movRegToStack.mod = MOD_REG_PLUS_DISP8;
+  movRegToStack.rm = REG_RBP;
 
   // movq %rbx, -8(%rbp)
-  movRegToStack.reg = 3;  // Source Register
+  movRegToStack.reg = REG_RBX;
   movRegToStack.displacement = -8;
   emit_instruction(code, pos, &movRegToStack);
 
   // movq %r12, -16(%rbp)
-  movRegToStack.reg = 12;
+  movRegToStack.reg = REG_R12;
   movRegToStack.displacement = -16;
   emit_instruction(code, pos, &movRegToStack);
 
   // movq %r13, -24(%rbp)
-  movRegToStack.reg = 13;
+  movRegToStack.reg = REG_R13;
   movRegToStack.displacement = -24;
   emit_instruction(code, pos, &movRegToStack);
 
   // movq %r14, -32(%rbp)
-  movRegToStack.reg = 14;
+  movRegToStack.reg = REG_R14;
   movRegToStack.displacement = -32;
   emit_instruction(code, pos, &movRegToStack);
 
   // movq %r15, -40(%rbp)
-  movRegToStack.reg = 15;
+  movRegToStack.reg = REG_R15;
   movRegToStack.displacement = -40;
   emit_instruction(code, pos, &movRegToStack);
 }
@@ -286,35 +324,35 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
  */
 static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   Instruction movFromStackToReg = {0};
-  movFromStackToReg.opcode = OP_MOV_FROM_RM_TO_REG;
-  movFromStackToReg.is_64bit = 1;  // REX.W
-  movFromStackToReg.use_modrm = 1;
-  movFromStackToReg.mod = BASE_PLUS_DISP8;
-  movFromStackToReg.rm = 5;  // Source Base is RBP (ID 5)
+  movFromStackToReg.opcode = OP_MOV_RM_TO_REG;
+  movFromStackToReg.is_64bit = 1;
   movFromStackToReg.use_disp = 1;
+  movFromStackToReg.use_modrm = 1;
+  movFromStackToReg.mod = MOD_REG_PLUS_DISP8;
+  movFromStackToReg.rm = REG_RBP;
 
   // movq -8(%rbp), %rbx
-  movFromStackToReg.reg = 3;  // Destination Register
+  movFromStackToReg.reg = REG_RBX;
   movFromStackToReg.displacement = -8;
   emit_instruction(code, pos, &movFromStackToReg);
 
   // movq -16(%rbp), %r12
-  movFromStackToReg.reg = 12;
+  movFromStackToReg.reg = REG_R12;
   movFromStackToReg.displacement = -16;
   emit_instruction(code, pos, &movFromStackToReg);
 
   // movq -24(%rbp), %r13
-  movFromStackToReg.reg = 13;
+  movFromStackToReg.reg = REG_R13;
   movFromStackToReg.displacement = -24;
   emit_instruction(code, pos, &movFromStackToReg);
 
   // movq -32(%rbp), %r14
-  movFromStackToReg.reg = 14;
+  movFromStackToReg.reg = REG_R14;
   movFromStackToReg.displacement = -32;
   emit_instruction(code, pos, &movFromStackToReg);
 
   // movq -40(%rbp), %r15
-  movFromStackToReg.reg = 15;
+  movFromStackToReg.reg = REG_R15;
   movFromStackToReg.displacement = -40;
   emit_instruction(code, pos, &movFromStackToReg);
 }
@@ -332,6 +370,7 @@ static void emit_epilogue(unsigned char code[], int* pos) {
 
 static void emit_return(unsigned char code[], int* pos, char retType, int returnValue) {
   Instruction retVar = {0};
+  // TODO:
   /**
    * local variable return (ret vX):
    * emits machine code for returning an SBas variable (v1 through v5)
@@ -340,13 +379,13 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
     int regCode = get_hardware_reg_index('v', returnValue);
     if (regCode == -1) return;
 
-    retVar.opcode = OP_MOV_FROM_REG_TO_RM;
-    retVar.is_64bit = 1;
+    retVar.opcode = OP_MOV_REG_TO_RM;
+    // retVar.is_64bit = 1;
 
     retVar.use_modrm = 1;
-    retVar.mod = REGISTER_DIRECT;
+    retVar.mod = MOD_REGISTER_DIRECT;
     retVar.reg = regCode;
-    retVar.rm = 0;  // being explicit: eax's rd = 0
+    retVar.rm = REG_RAX;
     emit_instruction(code, pos, &retVar);
   }
   /**
@@ -354,10 +393,11 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
    * emits machine code for returning an immediate value (movl $imm32, %eax)
    */
   else if (retType == '$') {
-    // mov(l) $imm32, %eax
-    retVar.opcode = OP_MOV_FROM_IMM_TO_REG;
+    retVar.opcode = OP_MOV_IMM_TO_RD;
+
     retVar.is_imm_mov = 1;
-    retVar.imm_mov_rd = 0;  // being explicit: eax's rd = 0
+    retVar.imm_mov_rd = REG_RAX;
+
     retVar.use_imm = 1;
     retVar.immediate = returnValue;
     retVar.imm_size = 4;
@@ -373,17 +413,18 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
  */
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
   Instruction attribution = {0};
-  // att var to var
+  // TODO:
+  //  att var to var
   if (varpcPrefix == 'v') {
     int srcRegCode = get_hardware_reg_index('v', idxVarpc);
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    attribution.opcode = OP_MOV_FROM_REG_TO_RM;
-    attribution.is_64bit = 1;  // except for v1, v2-v5 are extended registers
+    attribution.opcode = OP_MOV_REG_TO_RM;
+    // attribution.is_64bit = 1;
 
     attribution.use_modrm = 1;
-    attribution.mod = REGISTER_DIRECT;
+    attribution.mod = MOD_REGISTER_DIRECT;
     attribution.reg = srcRegCode;
     attribution.rm = dstRegCode;
 
@@ -395,10 +436,10 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    attribution.opcode = OP_MOV_FROM_REG_TO_RM;
+    attribution.opcode = OP_MOV_REG_TO_RM;
 
     attribution.use_modrm = 1;
-    attribution.mod = REGISTER_DIRECT;
+    attribution.mod = MOD_REGISTER_DIRECT;
     attribution.reg = srcRegCode;
     attribution.rm = dstRegCode;
     emit_instruction(code, pos, &attribution);
@@ -407,7 +448,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
   else if (varpcPrefix == '$') {
     int dstRegCode = get_hardware_reg_index('v', idxVar);
 
-    attribution.opcode = OP_MOV_FROM_IMM_TO_REG;
+    attribution.opcode = OP_MOV_IMM_TO_RD;
 
     attribution.is_imm_mov = 1;
     attribution.imm_mov_rd = dstRegCode;
@@ -447,16 +488,14 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    mov.opcode = OP_MOV_FROM_REG_TO_RM;
+    mov.opcode = OP_MOV_REG_TO_RM;
     mov.use_modrm = 1;
-    mov.mod = REGISTER_DIRECT;
+    mov.mod = MOD_REGISTER_DIRECT;
     mov.reg = srcRegCode;
     mov.rm = dstRegCode;
-
-    emit_instruction(code, pos, &mov);
   } else if (varc1Prefix == '$') {
     int dstRegCode = get_hardware_reg_index('v', idxVar);
-    mov.opcode = OP_MOV_FROM_IMM_TO_REG;
+    mov.opcode = OP_MOV_IMM_TO_RD;
 
     mov.is_imm_mov = 1;
     mov.imm_mov_rd = dstRegCode;
@@ -464,22 +503,22 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     mov.use_imm = 1;
     mov.imm_size = 4;
     mov.immediate = idxVarc1;
-    emit_instruction(code, pos, &mov);
   } else {
     fprintf(stderr, "emit_arithmetic_operation: invalid varc1Prefix: %c\n", varc1Prefix);
     return;
   }
+  emit_instruction(code, pos, &mov);
 
   /**
    * Second instruction of an arithmetic operation:
    * <operation> <rightOperand>, <attributedVar>
    */
   Instruction arithmeticOperation = {0};
+  arithmeticOperation.use_modrm = 1;
+  arithmeticOperation.mod = MOD_REGISTER_DIRECT;
+
   int dstRegCode = get_hardware_reg_index('v', idxVar);
   if (dstRegCode == -1) return;
-
-  arithmeticOperation.use_modrm = 1;
-  arithmeticOperation.mod = REGISTER_DIRECT;
 
   if (varc2Prefix == 'v') {
     int srcRegCode = get_hardware_reg_index('v', idxVarc2);
@@ -529,8 +568,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         arithmeticOperation.opcode = fitsInByte ? OP_IMM8_ARITHM_OP : OP_IMM32_ARITHM_OP;
 
         // Only difference lies in the reg field:
-        // ADD is 0, SUB is 5 (101)
-        arithmeticOperation.reg = (op == '+') ? 0 : 5;
+        arithmeticOperation.reg = (op == '+') ? EXT_ADD : EXT_SUB;
         break;
       }
       case '*': {
@@ -559,11 +597,11 @@ static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
 
   Instruction cmp = {0};
   cmp.opcode = OP_IMM8_ARITHM_OP;
-  cmp.use_modrm = 1;
-  cmp.mod = REGISTER_DIRECT;
-  cmp.reg = 7;  // 111 (cmp)
-  cmp.rm = regCode;
   cmp.isCmp = 1;
+  cmp.use_modrm = 1;
+  cmp.mod = MOD_REGISTER_DIRECT;
+  cmp.reg = EXT_CMP;
+  cmp.rm = regCode;
 
   emit_instruction(code, pos, &cmp);
 }
@@ -592,15 +630,15 @@ static int get_hardware_reg_index(char type, int idx) {
   if (type == 'v') {
     switch (idx) {
       case 1:
-        return 3;  // RBX
+        return REG_RBX;
       case 2:
-        return 12;  // R12
+        return REG_R12;
       case 3:
-        return 13;  // R13
+        return REG_R13;
       case 4:
-        return 14;  // R14
+        return REG_R14;
       case 5:
-        return 15;  // R15
+        return REG_R15;
       default:
         fprintf(stderr, "get_hardware_reg_index: invalid variable index %c\n", idx);
         return -1;
@@ -608,11 +646,11 @@ static int get_hardware_reg_index(char type, int idx) {
   } else if (type == 'p') {
     switch (idx) {
       case 1:
-        return 7;  // RDI (System V ABI 1st arg)
+        return REG_RDI;
       case 2:
-        return 6;  // RSI (System V ABI 2nd arg)
+        return REG_RSI;
       case 3:
-        return 2;  // RDX (System V ABI 3rd arg)
+        return REG_RDX;
       default:
         fprintf(stderr, "get_hardware_reg_index: invalid param index %c\n", idx);
         return -1;
