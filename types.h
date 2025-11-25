@@ -52,7 +52,7 @@ typedef struct {
   unsigned char imm_size;  // 1 or 4 bytes
 
   unsigned char is_small_ret;  // for the optimized mov instruction
-  int small_ret_reg_src_id;
+  int small_ret_rd;
 
   unsigned char isArithmOp;
   unsigned char isCmp;

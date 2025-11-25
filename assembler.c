@@ -19,6 +19,21 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 static int get_hardware_reg_index(char type, int idx);
 
+typedef enum {
+  OP_SAVE_BASE_PTR_IN_STACK_FRAME = 0x55,               // pushq %rbp
+  OP_MOV_FROM_REG_TO_RM = 0x89,                         // move r32/64 to r/m 32/64
+  OP_MOV_FROM_RM_TO_REG = 0x8B,                         // move r/m 32/64 to r32/64
+  OP_MOV_FROM_IMM_TO_REG = 0xB8,                        // move imm32/64 to r32/64 (requires rd embedded in opcode)
+  OP_IMM8_ARITHM_OP = 0x83,                             // arithmetic operation with byte immediate
+  OP_ADD_REG_TO_RM = 0x01,                              // add r32/64 to r/m 32/64
+  OP_SUB_REG_FROM_RM = 0x29,                            // subtract r32/64 from r/m 32/64
+  OP_IMUL_REG_BY_RM_STORE_IN_REG = (0x0F << 8) | 0xAF,  // multiply r/m 32/64 by r32/64 and store in r32/64 (r32/64 := r/m 32/64 * r32/64 )
+  OP_IMUL_RM_BY_BYTE_STORE_IN_REG = 0x6B,               // multiply r/m 32/64 by imm8 and store in r32/64
+  OP_IMUL_RM_BY_INT_STORE_IN_REG = 0x69,                // multiply r/m 32/64 by imm32 and store in r32/64
+  OP_LEAVE = 0xc9,
+  OP_RET = 0xc3,
+} Opcode;
+
 /**
  * Receives an **open** file handle of the SBas file and
  * attempts to write corresponding logic in x86-64 machine code to a buffer
@@ -182,12 +197,12 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
  */
 static void emit_prologue(unsigned char code[], int* pos) {
   // pushq %rbp
-  code[*pos] = 0x55;
+  code[*pos] = OP_SAVE_BASE_PTR_IN_STACK_FRAME;
   (*pos)++;
 
   // movq %rsp, %rbp
   Instruction initStackFrame = {0};
-  initStackFrame.opcode = 0x89;  // mov
+  initStackFrame.opcode = OP_MOV_FROM_REG_TO_RM;
   initStackFrame.is_64bit = 1;
 
   initStackFrame.use_modrm = 1;
@@ -212,7 +227,7 @@ static void emit_prologue(unsigned char code[], int* pos) {
 static void save_callee_saved_registers(unsigned char code[], int* pos) {
   // adjust stack pointer: subq $48, %rsp
   Instruction sub = {0};
-  sub.opcode = 0x83;  // 0x83 = Arithmetic with byte immediate
+  sub.opcode = OP_IMM8_ARITHM_OP;
   sub.is_64bit = 1;
   sub.use_modrm = 1;
   sub.mod = 3;  // 11 = Register Direct Mode
@@ -226,8 +241,8 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
   // 2. Save Registers to Stack
   // Create a template for "MOV Reg to Memory[RBP + Offset]"
   Instruction mov = {0};
-  mov.opcode = 0x89;  // MOV r/m64, r64
-  mov.is_64bit = 1;   // REX.W
+  mov.opcode = OP_MOV_FROM_REG_TO_RM;
+  mov.is_64bit = 1;  // REX.W
   mov.use_modrm = 1;
   mov.mod = 1;       // 01 = Memory + Byte Displacement
   mov.rm = 5;        // Destination Base is RBP (ID 5)
@@ -265,8 +280,8 @@ static void save_callee_saved_registers(unsigned char code[], int* pos) {
 static void restore_callee_saved_registers(unsigned char code[], int* pos) {
   // Create a template for "MOV Memory[RBP + Offset] to Reg"
   Instruction mov = {0};
-  mov.opcode = 0x8B;  // 0x8B = "Move FROM Memory TO Register"
-  mov.is_64bit = 1;   // REX.W
+  mov.opcode = OP_MOV_FROM_RM_TO_REG;
+  mov.is_64bit = 1;  // REX.W
   mov.use_modrm = 1;
   mov.mod = 1;       // 01 = Memory + Byte Displacement
   mov.rm = 5;        // Source Base is RBP (ID 5)
@@ -303,11 +318,11 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos) {
  */
 static void emit_epilogue(unsigned char code[], int* pos) {
   // leave
-  code[*pos] = 0xc9;
+  code[*pos] = OP_LEAVE;
   (*pos)++;
 
   // ret
-  code[*pos] = 0xc3;
+  code[*pos] = OP_RET;
   (*pos)++;
 }
 
@@ -321,7 +336,7 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
     int regCode = get_hardware_reg_index('v', returnValue);
     if (regCode == -1) return;
 
-    retVar.opcode = 0x89;
+    retVar.opcode = OP_MOV_FROM_REG_TO_RM;
     retVar.is_64bit = 1;
 
     retVar.use_modrm = 1;
@@ -335,11 +350,10 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
    * emits machine code for returning an immediate value (movl $imm32, %eax)
    */
   else if (retType == '$') {
-    // optimization? instruction for putting immediates into eax (default, rd =
-    // 0) https://www.felixcloutier.com/x86/mov
-
-    retVar.opcode = 0xb8;  // movl ..., %eax
+    // mov(l) $imm32, %eax
+    retVar.opcode = OP_MOV_FROM_IMM_TO_REG;
     retVar.is_small_ret = 1;
+    retVar.small_ret_rd = 0;  // being explicit: eax's rd = 0
     retVar.use_imm = 1;
     retVar.immediate = returnValue;
     retVar.imm_size = 4;
@@ -361,8 +375,8 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    movReg2Reg.opcode = 0x89;  // standard move
-    movReg2Reg.is_64bit = 1;   // except for v1, v2-v5 are extended registers
+    movReg2Reg.opcode = OP_MOV_FROM_REG_TO_RM;
+    movReg2Reg.is_64bit = 1;  // except for v1, v2-v5 are extended registers
 
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
@@ -377,7 +391,7 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    movReg2Reg.opcode = 0x89;  // standard move
+    movReg2Reg.opcode = OP_MOV_FROM_REG_TO_RM;
 
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
@@ -389,10 +403,10 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
   else if (varpcPrefix == '$') {
     int dstRegCode = get_hardware_reg_index('v', idxVar);
 
-    movReg2Reg.opcode = 0xB8;  // imm move
+    movReg2Reg.opcode = OP_MOV_FROM_IMM_TO_REG;
 
     movReg2Reg.is_small_ret = 1;
-    movReg2Reg.small_ret_reg_src_id = dstRegCode;
+    movReg2Reg.small_ret_rd = dstRegCode;
 
     movReg2Reg.use_imm = 1;
     movReg2Reg.imm_size = 4;
@@ -430,7 +444,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     int dstRegCode = get_hardware_reg_index('v', idxVar);
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
-    movReg2Reg.opcode = 0x89;
+    movReg2Reg.opcode = OP_MOV_FROM_REG_TO_RM;
     movReg2Reg.use_modrm = 1;
     movReg2Reg.mod = 3;
     movReg2Reg.reg = srcRegCode;
@@ -439,10 +453,10 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     emit_instruction(code, pos, &movReg2Reg);
   } else if (varc1Prefix == '$') {
     int dstRegCode = get_hardware_reg_index('v', idxVar);
-    movReg2Reg.opcode = 0xB8;  // imm move
+    movReg2Reg.opcode = OP_MOV_FROM_IMM_TO_REG;
 
     movReg2Reg.is_small_ret = 1;
-    movReg2Reg.small_ret_reg_src_id = dstRegCode;
+    movReg2Reg.small_ret_rd = dstRegCode;
 
     movReg2Reg.use_imm = 1;
     movReg2Reg.imm_size = 4;
@@ -465,13 +479,13 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
 
     switch (op) {
       case '+':
-        arithmOp.opcode = 0x01;
+        arithmOp.opcode = OP_ADD_REG_TO_RM;
         break;
       case '-':
-        arithmOp.opcode = 0x29;
+        arithmOp.opcode = OP_SUB_REG_FROM_RM;
         break;
       case '*':
-        arithmOp.opcode = (0x0F << 8) | 0xAF;
+        arithmOp.opcode = OP_IMUL_REG_BY_RM_STORE_IN_REG;
         break;
       default:
         fprintf(stderr, "emit_arithmetic_operation: invalid operation: %c\n", op);
@@ -506,14 +520,14 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     switch (op) {
       case '+': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          arithmOp.opcode = 0x83;  // add(b) imm8, r/m32
-          arithmOp.use_imm = 1;
-          arithmOp.imm_size = 1;  // 8 bits
-          arithmOp.immediate = idxVarc2;
+          arithmOp.opcode = OP_IMM8_ARITHM_OP;  // add(b) imm8, r/m32
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
           arithmOp.mod = 3;
           arithmOp.rm = dstRegCode;
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 1;  // 8 bits
+          arithmOp.immediate = idxVarc2;
 
           emit_instruction(code, pos, &arithmOp);
         } else {
@@ -531,15 +545,16 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
       }
       case '-': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          arithmOp.opcode = 0x83;  // sub(b) imm8, r/m32
-          arithmOp.use_imm = 1;
-          arithmOp.imm_size = 1;  // 8 bits
-          arithmOp.immediate = idxVarc2;
+          arithmOp.opcode = OP_IMM8_ARITHM_OP;  // sub(b) imm8, r/m32
           arithmOp.isArithmOp = 1;
           arithmOp.use_modrm = 1;
           arithmOp.mod = 3;
           arithmOp.rm = dstRegCode;
           arithmOp.reg = 5;  // 101 in reg, indicating subtraction
+          arithmOp.use_imm = 1;
+          arithmOp.imm_size = 1;  // 8 bits
+          arithmOp.immediate = idxVarc2;
+
           emit_instruction(code, pos, &arithmOp);
         } else {
           arithmOp.opcode = 0x81;  // sub(l) imm32, r/m32
@@ -557,7 +572,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
       }
       case '*': {
         if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          arithmOp.opcode = 0x6B;  // imul(b) imm8, r/m32
+          arithmOp.opcode = OP_IMUL_RM_BY_BYTE_STORE_IN_REG;  // imul(b) imm8, r/m32
           arithmOp.use_imm = 1;
           arithmOp.imm_size = 1;  // 8 bits
           arithmOp.immediate = idxVarc2;
@@ -569,7 +584,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
           arithmOp.reg = dstRegCode;
           emit_instruction(code, pos, &arithmOp);
         } else {
-          arithmOp.opcode = 0x69;  // imul(l) imm32, r/m32
+          arithmOp.opcode = OP_IMUL_RM_BY_INT_STORE_IN_REG;  // imul(l) imm32, r/m32
           arithmOp.use_imm = 1;
           arithmOp.imm_size = 4;  // 32 bits
           arithmOp.immediate = idxVarc2;
@@ -601,7 +616,7 @@ static void emit_cmp(unsigned char code[], int* pos, int varIndex) {
   if (regCode == -1) return;
 
   Instruction cmp = {0};
-  cmp.opcode = 0x83;  // arithm. op. with imm8
+  cmp.opcode = OP_IMM8_ARITHM_OP;
   cmp.use_modrm = 1;
   cmp.mod = 3;  // 11
   cmp.reg = 7;  // 111 (cmp)
@@ -689,7 +704,7 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
   if (inst->is_small_ret) {
     // Case: Opcode embedding (e.g. 0xB8 + reg)
     // We only need REX.B if the register index is 8-15 (r8-r15)
-    if (inst->small_ret_reg_src_id > 7) {
+    if (inst->small_ret_rd > 7) {
       rex |= 0x01;  // REX.B
       needs_rex = 1;
     }
@@ -726,7 +741,7 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
     unsigned int combinedOpcode = inst->opcode;
 
     if (inst->is_small_ret) {
-      combinedOpcode += (inst->small_ret_reg_src_id & 7);
+      combinedOpcode += (inst->small_ret_rd & 7);
     }
     code[(*pos)++] = (unsigned char)combinedOpcode;
   }
