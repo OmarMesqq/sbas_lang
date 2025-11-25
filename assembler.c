@@ -370,7 +370,6 @@ static void emit_epilogue(unsigned char code[], int* pos) {
 
 static void emit_return(unsigned char code[], int* pos, char retType, int returnValue) {
   Instruction retVar = {0};
-  // TODO:
   /**
    * local variable return (ret vX):
    * emits machine code for returning an SBas variable (v1 through v5)
@@ -380,7 +379,6 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
     if (regCode == -1) return;
 
     retVar.opcode = OP_MOV_REG_TO_RM;
-    // retVar.is_64bit = 1;
 
     retVar.use_modrm = 1;
     retVar.mod = MOD_REGISTER_DIRECT;
@@ -413,7 +411,6 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
  */
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
   Instruction attribution = {0};
-  // TODO:
   //  att var to var
   if (varpcPrefix == 'v') {
     int srcRegCode = get_hardware_reg_index('v', idxVarpc);
@@ -421,7 +418,6 @@ static void emit_attribution(unsigned char code[], int* pos, int idxVar, char va
     if (srcRegCode == -1 || dstRegCode == -1) return;
 
     attribution.opcode = OP_MOV_REG_TO_RM;
-    // attribution.is_64bit = 1;
 
     attribution.use_modrm = 1;
     attribution.mod = MOD_REGISTER_DIRECT;
