@@ -19,7 +19,6 @@ static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 static int get_hardware_reg_index(char type, int idx);
 
-// TODO: 0x83 is used for all imm8 ops and 0x81 for imm32, difference is reg field
 typedef enum {
   OP_SAVE_BASE_PTR_IN_STACK_FRAME = 0x55,               // pushq %rbp
   OP_MOV_FROM_REG_TO_RM = 0x89,                         // move r32/64 to r/m 32/64
@@ -518,57 +517,34 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
     arithmeticOperation.rm = dstRegCode;
     arithmeticOperation.use_imm = 1;
     arithmeticOperation.immediate = idxVarc2;
+
     /**
-     * Emit arithmetic operations:
-     * the ifs are an optimization check -
-     * if the operand in question fits in a byte (-128 to 127), emit imm8 instructions,
-     * otherwise emit for imm32
+     * A tiny optimization:
+     * if the immediate fits in a byte, use the appropriate instruction
+     * emitting only 3 bytes: opcode, ModRM, and imm.
+     * otherwise use the int one, emitting 6:
+     * opcode, ModRM, imm, imm, imm, imm
      */
+    // use imm8 or imm32 depending on immediate's size
+    int fitsInByte = (idxVarc2 >= -128 && idxVarc2 <= 127);
+    arithmeticOperation.imm_size = fitsInByte ? 1 : 4;
+
     switch (op) {
-      case '+': {
-        if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          // add(b) imm8, r/m32
-          arithmeticOperation.opcode = OP_IMM8_ARITHM_OP;
-          arithmeticOperation.imm_size = 1;  // 8 bits
-          emit_instruction(code, pos, &arithmeticOperation);
-        } else {
-          // add(l) imm32, r/m32
-          arithmeticOperation.opcode = OP_IMM32_ARITHM_OP;
-          arithmeticOperation.imm_size = 4;  // 32 bits
-          emit_instruction(code, pos, &arithmeticOperation);
-        }
-        break;
-      }
+      case '+':
       case '-': {
-        if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          // sub(b) imm8, r/m32
-          arithmeticOperation.opcode = OP_IMM8_ARITHM_OP;
-          arithmeticOperation.reg = 5;  // 101 in reg, indicating subtraction
-          arithmeticOperation.imm_size = 1;  // 8 bits
-          emit_instruction(code, pos, &arithmeticOperation);
-        } else {
-          // sub(l) imm32, r/m32
-          arithmeticOperation.opcode = OP_IMM32_ARITHM_OP;
-          arithmeticOperation.imm_size = 4;  // 32 bits
-          arithmeticOperation.reg = 5;  // 101 in reg, indicating subtraction
-          emit_instruction(code, pos, &arithmeticOperation);
-        }
+        // ADD and SUB share the same opcodes (0x83 for byte, 0x81 for int)
+        arithmeticOperation.opcode = fitsInByte ? OP_IMM8_ARITHM_OP : OP_IMM32_ARITHM_OP;
+
+        // Only difference lies in the reg field:
+        // ADD is 0, SUB is 5 (101)
+        arithmeticOperation.reg = (op == '+') ? 0 : 5;
         break;
       }
       case '*': {
-        if (idxVarc2 >= -128 && idxVarc2 <= 127) {
-          // imul(b) imm8, r/m32
-          arithmeticOperation.opcode = OP_IMUL_RM_BY_BYTE_STORE_IN_REG;
-          arithmeticOperation.imm_size = 1;  // 8 bits
-          arithmeticOperation.reg = dstRegCode; // src and dst register are the same
-          emit_instruction(code, pos, &arithmeticOperation);
-        } else {
-          // imul(l) imm32, r/m32
-          arithmeticOperation.opcode = OP_IMUL_RM_BY_INT_STORE_IN_REG;
-          arithmeticOperation.imm_size = 4;  // 32 bits
-          arithmeticOperation.reg = dstRegCode; // src and dst register are the same
-          emit_instruction(code, pos, &arithmeticOperation);
-        }
+        arithmeticOperation.opcode = fitsInByte ? OP_IMUL_RM_BY_BYTE_STORE_IN_REG : OP_IMUL_RM_BY_INT_STORE_IN_REG;
+
+        // IMUL uses the reg field for the destination
+        arithmeticOperation.reg = dstRegCode;
         break;
       }
       default: {
@@ -576,6 +552,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
         return;
       }
     }
+    emit_instruction(code, pos, &arithmeticOperation);
   }
 }
 
@@ -632,6 +609,7 @@ static int get_hardware_reg_index(char type, int idx) {
       case 5:
         return 15;  // R15
       default:
+        fprintf(stderr, "get_hardware_reg_index: invalid variable index %c\n", idx);
         return -1;
     }
   } else if (type == 'p') {
@@ -643,9 +621,11 @@ static int get_hardware_reg_index(char type, int idx) {
       case 3:
         return 2;  // RDX (System V ABI 3rd arg)
       default:
+        fprintf(stderr, "get_hardware_reg_index: invalid param index %c\n", idx);
         return -1;
     }
   }
+  fprintf(stderr, "get_hardware_reg_index: invalid type %c\n", type);
   return -1;
 }
 
