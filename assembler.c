@@ -167,7 +167,6 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
         }
         // arithmetic operation
         else if (operator == '=') {
-          int idxVar;
           char varc1Prefix;
           int idxVarc1;
           char op;
@@ -373,7 +372,7 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
 
   // local variable return (ret vX)
   if (retType == 'v') {
-    int regCode = get_hardware_reg_index('v', returnValue);
+    int regCode = get_hardware_reg_index(retType, returnValue);
     if (regCode == -1) return;
 
     _return.opcode = OP_MOV_REG_TO_RM;
@@ -409,6 +408,7 @@ static void emit_return(unsigned char code[], int* pos, char retType, int return
 static void emit_attribution(unsigned char code[], int* pos, int idxVar, char varpcPrefix, int idxVarpc) {
   Instruction attribution = {0};
 
+  // target of an attribution is always a register
   int dstRegCode = get_hardware_reg_index('v', idxVar);
   if (dstRegCode == -1) return;
 
@@ -463,12 +463,12 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
    */
   Instruction mov = {0};
 
-  // target of arithmetic operation is always a register
+  // target of an arithmetic operation is always a register
   int dstRegCode = get_hardware_reg_index('v', idxVar);
   if (dstRegCode == -1) return;
 
   if (varc1Prefix == 'v') {
-    int srcRegCode = get_hardware_reg_index('v', idxVarc1);
+    int srcRegCode = get_hardware_reg_index(varc1Prefix, idxVarc1);
     if (srcRegCode == -1) return;
 
     mov.opcode = OP_MOV_REG_TO_RM;
@@ -501,7 +501,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, int idxVar
   arithmeticOperation.mod = MOD_REGISTER_DIRECT;
 
   if (varc2Prefix == 'v') {
-    int srcRegCode = get_hardware_reg_index('v', idxVarc2);
+    int srcRegCode = get_hardware_reg_index(varc2Prefix, idxVarc2);
 
     switch (op) {
       case '+':
