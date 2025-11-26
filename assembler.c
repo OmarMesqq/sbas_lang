@@ -484,30 +484,35 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* d
   int dstRegCode = get_hardware_reg_index(dest->type, dest->value);
   if (dstRegCode == -1) return;
 
-  if (lhs->type == 'v') {
-    int srcRegCode = get_hardware_reg_index(lhs->type, lhs->value);
-    if (srcRegCode == -1) return;
+  // Peephole optimization? Only emit mov if LHS is different from the Destination
+  const char isRedundantMove = (lhs->type == 'v' && (lhs->value == dest->value));
 
-    mov.opcode = OP_MOV_REG_TO_RM;
+  if (!isRedundantMove) {
+    if (lhs->type == 'v') {
+      int srcRegCode = get_hardware_reg_index(lhs->type, lhs->value);
+      if (srcRegCode == -1) return;
 
-    mov.use_modrm = 1;
-    mov.mod = MOD_REGISTER_DIRECT;
-    mov.reg = srcRegCode;
-    mov.rm = dstRegCode;
-  } else if (lhs->type == '$') {
-    mov.opcode = OP_MOV_IMM_TO_RD;
+      mov.opcode = OP_MOV_REG_TO_RM;
 
-    mov.is_imm_mov = 1;
-    mov.imm_mov_rd = dstRegCode;
+      mov.use_modrm = 1;
+      mov.mod = MOD_REGISTER_DIRECT;
+      mov.reg = srcRegCode;
+      mov.rm = dstRegCode;
+    } else if (lhs->type == '$') {
+      mov.opcode = OP_MOV_IMM_TO_RD;
 
-    mov.use_imm = 1;
-    mov.imm_size = 4;
-    mov.immediate = lhs->value;
-  } else {
-    fprintf(stderr, "emit_arithmetic_operation: invalid LHS operand type: %c\n", lhs->type);
-    return;
+      mov.is_imm_mov = 1;
+      mov.imm_mov_rd = dstRegCode;
+
+      mov.use_imm = 1;
+      mov.imm_size = 4;
+      mov.immediate = lhs->value;
+    } else {
+      fprintf(stderr, "emit_arithmetic_operation: invalid LHS operand type: %c\n", lhs->type);
+      return;
+    }
+    emit_instruction(code, pos, &mov);
   }
-  emit_instruction(code, pos, &mov);
 
   /**
    * Second instruction of an arithmetic operation:
