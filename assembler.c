@@ -29,7 +29,7 @@ static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol);
 static void emit_attribution(unsigned char code[], int* pos, Operand* dest, Operand* source);
 static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* dest, Operand* lhs, char op, Operand* rhs);
 static void emit_cmp(unsigned char code[], int* pos, Operand* op);
-static void emit_jle_rel32(unsigned char code[], int* pos);
+static void emit_near_jump(unsigned char code[], int* pos);
 static void restore_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_epilogue(unsigned char code[], int* pos);
 static int get_hardware_reg_index(char type, int idx);
@@ -225,7 +225,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
         // 0x7E + 1 byte offset
         // https://www.felixcloutier.com/x86/jcc
 
-        emit_jle_rel32(code, &pos);
+        emit_near_jump(code, &pos);
 
         // Mark current line to be resolved in patching step
         rt[*relocCount].lineTarget = lineTarget;
@@ -621,7 +621,7 @@ static void emit_cmp(unsigned char code[], int* pos, Operand* op) {
  * This is a big instruction, nonetheless kind of interesting as
  * it allows jumping to pretty much anywhere in code (+- 2GB).
  */
-static void emit_jle_rel32(unsigned char code[], int* pos) {
+static void emit_near_jump(unsigned char code[], int* pos) {
   code[(*pos)++] = 0x0F;
   code[(*pos)++] = 0x8E;
 }
