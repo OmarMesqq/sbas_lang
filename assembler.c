@@ -436,6 +436,11 @@ static void emit_attribution(unsigned char code[], int* pos, Operand* dest, Oper
   int dstRegCode = get_hardware_reg_index(dest->type, dest->value);
   if (dstRegCode == -1) return;
 
+  // Peephole optimization? Only emit mov if Source is different from Destination
+  if (source->type == 'v' && (source->value == dest->value)) {
+    return;
+  }
+
   // var to var attribution (vX : vY) and param to var attribution (vX : pY)
   if (source->type == 'v' || source->type == 'p') {
     int srcRegCode = get_hardware_reg_index(source->type, source->value);
@@ -484,7 +489,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* d
   int dstRegCode = get_hardware_reg_index(dest->type, dest->value);
   if (dstRegCode == -1) return;
 
-  // Peephole optimization? Only emit mov if LHS is different from the Destination
+  // Peephole optimization? Only emit mov if LHS is different from Destination
   const char isRedundantMove = (lhs->type == 'v' && (lhs->value == dest->value));
 
   if (!isRedundantMove) {
