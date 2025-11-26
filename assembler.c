@@ -611,7 +611,11 @@ static void emit_cmp(unsigned char code[], int* pos, Operand* op) {
  * - 2 opcode bytes
  * - 4 bytes for `cd` (code offset doubleword - 32 bits)
  *
- * It is the **caller's responsibility** to write `cd`'s 4 bytes
+ * After this function is called, the buffer's offset `pos`
+ * points to the start of the 4-byte placeholder to be fixed up during
+ * linking, *past* the opcode's bytes.
+ *
+ * As such, it's the **caller's responsibility** to write `cd`'s 4 bytes
  * immediately after this one.
  *
  * This is a big instruction, nonetheless kind of interesting as
