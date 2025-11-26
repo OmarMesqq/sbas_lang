@@ -86,9 +86,9 @@ int stringToInt(char* str) {
 }
 
 /**
- * Receives a signed integer (32 bits on x86-64) in base 10 and writes it
- * in Little Endian hexadecimal in the buffer. Used for immediate values and
- * jump offsets.
+ * Writes in the buffer `code` at offset `pos` a base 10 signed `integer`
+ * (32 bits on x86-64) in Little Endian hexadecimal.
+ * Used for immediate values and jump offsets.
  */
 void emitIntegerInHex(unsigned char code[], int* pos, int integer) {
   code[*pos] = integer & 0xFF;

@@ -601,11 +601,18 @@ static void emit_cmp(unsigned char code[], int* pos, Operand* op) {
 }
 
 /**
- * Emits `jle rel32`
- * which allows jumping to anywhere in code (+- 2GB)
+ * Emits the opcode bytes of `jle rel32` (6 bytes wide).
+ * This is the instruction: `0F 8E cd`.
+ * - 2 opcode bytes
+ * - 4 bytes for `cd` (code offset doubleword - 32 bits)
+ *
+ * It is the **caller's responsibility** to write `cd`'s 4 bytes
+ * immediately after this one.
+ *
+ * This is a big instruction, nonetheless kind of interesting as
+ * it allows jumping to pretty much anywhere in code (+- 2GB).
  */
 static void emit_jle(unsigned char code[], int* pos) {
-  // jle rel32 must be followed by 4 bytes of offset
   code[(*pos)++] = 0x0F;
   code[(*pos)++] = 0x8E;
 
