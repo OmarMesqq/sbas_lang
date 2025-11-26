@@ -210,9 +210,9 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
       case 'i': { /* conditional jump */
         Operand op = {0};
         int variableIndex;
-        unsigned lineTarget;
+        unsigned targetLine;
 
-        if (sscanf(lineBuffer, "iflez v%d %u", &variableIndex, &lineTarget) != 2) {
+        if (sscanf(lineBuffer, "iflez v%d %u", &variableIndex, &targetLine) != 2) {
           compilationError("sbasCompile: invalid 'iflez' command: expected 'iflez vX line'", line);
           return -1;
         }
@@ -228,8 +228,9 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
         emit_near_jump(code, &pos);
 
         // Mark current line to be resolved in patching step
-        rt[*relocCount].lineTarget = lineTarget;
+        rt[*relocCount].targetLine = targetLine;
         rt[*relocCount].offset = pos;
+        rt[*relocCount].sourceLine = line;
         (*relocCount)++;
 
         // Emit 4-byte placeholder

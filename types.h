@@ -21,17 +21,18 @@ typedef struct {
 } LineTable;
 
 /**
- * Maps placeholders for conditional jumps at a given `offset` in the buffer
- * to the desired `lineTarget` in the `.sbas` file to jump to
+ * An entry for a linking step fixup. Holds the line requesting the jump,
+ * its offset in the buffer and the desired line to jump to.
  *
  * Fields:
- * - offset: position in the buffer where the jump offset needs to be patched to
- * jump to `lineTarget`
- * - lineTarget: line to jump to
+ * - `sourceLine`: line currently parsed that asked for a jump
+ * - `offset`: its position in the buffer
+ * - `targetLine`: line to jump to
  */
 typedef struct {
+  unsigned char sourceLine;
   int offset;
-  unsigned char lineTarget;
+  unsigned char targetLine;
 } RelocationTable;
 
 
