@@ -20,7 +20,13 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relo
      */
     RelocationTable relocationRequest = rt[i];
     int offsetToPatch = relocationRequest.offset;
-    const unsigned char targetLine = relocationRequest.targetLine;
+    const unsigned targetLine = relocationRequest.targetLine;
+    const unsigned sourceLine = relocationRequest.sourceLine;
+    int dif = lt[sourceLine].offset - lt[targetLine].offset;
+    char shortJump = 0;
+    if (dif >= -128 && dif <= 127) {
+      shortJump = 1;
+    }
 
     // Look up the target in the LineTable
     LineTable relocationTarget = lt[targetLine];

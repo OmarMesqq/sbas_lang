@@ -16,7 +16,7 @@ typedef int (*funcp)();
  * - offset: start of the line's instructions in the buffer
  */
 typedef struct {
-  unsigned char line;
+  unsigned line;
   int offset;
 } LineTable;
 
@@ -30,9 +30,9 @@ typedef struct {
  * - `targetLine`: line to jump to
  */
 typedef struct {
-  unsigned char sourceLine;
+  unsigned sourceLine;
   int offset;
-  unsigned char targetLine;
+  unsigned targetLine;
 } RelocationTable;
 
 
