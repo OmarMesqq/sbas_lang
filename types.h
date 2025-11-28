@@ -22,15 +22,17 @@ typedef struct {
 
 /**
  * An entry for a linking step fixup.
- * Maps the offset to be patched to the desired line to jump to.
+ * Maps a desired line OR offset to jump to to a source/requesting offset in the buffer
  *
  * Fields:
+ * - `targetLine`: line whose relative offset to the next instruction should be filled in
+ * - `targetOffset`: desired offset to jump to
  * - `offset`: index 0 of the 4 zero placeholder bytes that should be patched
- * - `targetLine`: the line whose relative offset to the next instruction should be filled in
  */
 typedef struct {
-  int offset;
   unsigned targetLine;
+  int targetOffset;
+  int offset;
 } RelocationTable;
 
 /**

@@ -25,7 +25,8 @@ typedef struct {
 static void emit_instruction(unsigned char code[], int* pos, Instruction* inst);
 static void emit_prologue(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
-static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol);
+static void emit_return_value(unsigned char code[], int* pos, Operand* returnSymbol);
+static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol, const char retFound, int* retOffset);
 static void emit_attribution(unsigned char code[], int* pos, Operand* dest, Operand* source);
 static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* dest, Operand* lhs, char op, Operand* rhs);
 static void emit_cmp(unsigned char code[], int* pos, Operand* op);
@@ -113,7 +114,8 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
   char lineBuffer[BUFFER_SIZE] = {0};      // a line in the SBas file
   char errorMsgBuffer[BUFFER_SIZE] = {0};  // a compilation error message
   int pos = 0;                             // byte position in the buffer
-  char retFound = 0;                       // every SBas function MUST return
+  char retFound = 0;                       // turns on when the first `'ret'` is found
+  int retOffset = 0;                       // position in buffer where the stack cleanup routine starts
 
   emit_prologue(code, &pos);
   save_callee_saved_registers(code, &pos);
@@ -144,8 +146,24 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
           return -1;
         }
 
-        emit_return(code, &pos, &returnSymbol);
-        if (!retFound) retFound = 1;
+        emit_return(code, &pos, &returnSymbol, retFound, &retOffset);
+
+        if (!retFound) {
+          retFound = 1;  // actually "find" the 1st ret after we've written the cleanup routine
+        } else {
+          code[pos++] = 0xE9;  // jmp rel32
+
+          // request relocation to jump to `retOffset` during linking
+          rt[*relocCount].offset = pos;
+          rt[*relocCount].targetOffset = retOffset;
+          (*relocCount)++;
+
+          // Emit 4-byte placeholder for 32-bit offset
+          code[pos++] = 0x00;
+          code[pos++] = 0x00;
+          code[pos++] = 0x00;
+          code[pos++] = 0x00;
+        }
 
         break;
       }
@@ -228,7 +246,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
         rt[*relocCount].offset = pos;
         (*relocCount)++;
 
-        // Emit 4-byte placeholder
+        // Emit 4-byte placeholder for 32-bit offset
         code[pos++] = 0x00;
         code[pos++] = 0x00;
         code[pos++] = 0x00;
@@ -278,6 +296,41 @@ static void emit_prologue(unsigned char code[], int* pos) {
   initializeStackPtr.rm = REG_RBP;
 
   emit_instruction(code, pos, &initializeStackPtr);
+}
+
+/**
+ * Emits machine code for storing a given value at the return register.
+ */
+static void emit_return_value(unsigned char code[], int* pos, Operand* returnSymbol) {
+  Instruction _return = {0};
+
+  // local variable return (ret vX)
+  if (returnSymbol->type == 'v') {
+    int regCode = get_hardware_reg_index(returnSymbol->type, returnSymbol->value);
+    if (regCode == -1) return;
+
+    _return.opcode = OP_MOV_REG_TO_RM;
+
+    _return.use_modrm = 1;
+    _return.mod = MOD_REGISTER_DIRECT;
+    _return.reg = regCode;
+    _return.rm = REG_RAX;
+  }
+  // constant literal return (ret $snum)
+  else if (returnSymbol->type == '$') {
+    _return.opcode = OP_MOV_IMM_TO_RD;
+
+    _return.is_imm_mov = 1;
+    _return.imm_mov_rd = REG_RAX;
+
+    _return.use_imm = 1;
+    _return.immediate = returnSymbol->value;
+    _return.imm_size = 4;
+  } else {
+    fprintf(stderr, "emit_return_value: invalid return type: %c\n", returnSymbol->type);
+    return;
+  }
+  emit_instruction(code, pos, &_return);
 }
 
 /**
@@ -388,38 +441,30 @@ static void emit_epilogue(unsigned char code[], int* pos) {
   (*pos)++;
 }
 
-static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol) {
-  Instruction _return = {0};
+/**
+ * Unconditionally emits a "return" as in storing the wanted return value on the return register.
+ * Whether it also emits the stack cleanup instructions - restoring callee-saveds and
+ * emitting `leave` and `ret` - is defined by the boolean `retFound` flag.
+ *
+ * If a return has already been found in SBas code, further `ret`'s will perform an
+ * unconditional jump to the stack cleanup address saving code size.
+ * Otherwise, the load value in return register instruction simply falls through the cleanup
+ * routine.
+ *
+ * @param code buffer to write machine code
+ * @param pos pointer to the current offset at the buffer
+ * @param returnSymbol pointer to `Operand` struct holding return value and type
+ * @param retFound flag that marks if this is the first `ret` found or subsequent ones
+ * @param retOffset pointer to integer where the function will write stack cleanup address if `retFound` is true
+ */
+static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol, const char retFound, int* retOffset) {
+  emit_return_value(code, pos, returnSymbol);
 
-  // local variable return (ret vX)
-  if (returnSymbol->type == 'v') {
-    int regCode = get_hardware_reg_index(returnSymbol->type, returnSymbol->value);
-    if (regCode == -1) return;
-
-    _return.opcode = OP_MOV_REG_TO_RM;
-
-    _return.use_modrm = 1;
-    _return.mod = MOD_REGISTER_DIRECT;
-    _return.reg = regCode;
-    _return.rm = REG_RAX;
+  if (!retFound) {
+    *retOffset = *pos;  // stack cleanup starts here: we'll write cleanup bytes next up
+    restore_callee_saved_registers(code, pos);
+    emit_epilogue(code, pos);
   }
-  // constant literal return (ret $snum)
-  else if (returnSymbol->type == '$') {
-    _return.opcode = OP_MOV_IMM_TO_RD;
-
-    _return.is_imm_mov = 1;
-    _return.imm_mov_rd = REG_RAX;
-
-    _return.use_imm = 1;
-    _return.immediate = returnSymbol->value;
-    _return.imm_size = 4;
-  } else {
-    fprintf(stderr, "emit_return: invalid return type: %c\n", returnSymbol->type);
-    return;
-  }
-  emit_instruction(code, pos, &_return);
-  restore_callee_saved_registers(code, pos);
-  emit_epilogue(code, pos);
 }
 
 /**

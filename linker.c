@@ -21,17 +21,23 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relo
     RelocationTable relocationRequest = rt[i];
     int offsetToPatch = relocationRequest.offset;
     const unsigned targetLine = relocationRequest.targetLine;
+    const unsigned targetOffset = relocationRequest.targetOffset;
 
     // Look up the target in the LineTable
     LineTable relocationTarget = lt[targetLine];
     const char lineExists = relocationTarget.line == 0 ? 0 : 1;
-    if (!lineExists) {
+    if (!lineExists && !targetOffset) {
       compilationError("sbasLink: jump target is not an executable line", targetLine);
       return -1;
     }
 
-    // the target line's offset in the buffer is the address we want to jump to
-    const int targetAddress = relocationTarget.offset;
+    int targetAddress = 0;
+    if (targetLine) {
+      // the target line's offset in the buffer is the address we want to jump to
+      targetAddress = relocationTarget.offset;
+    } else {
+      targetAddress = targetOffset;
+    }
 
     /**
      * The instruction right after the current one (jump) is obtained simply
