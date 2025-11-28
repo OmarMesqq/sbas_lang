@@ -31,7 +31,7 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relo
     }
 
     // the target line's offset in the buffer is the address we want to jump to
-    int targetAddress = relocationTarget.offset;
+    const int targetAddress = relocationTarget.offset;
 
     /**
      * The instruction right after the current one (jump) is obtained simply
@@ -48,7 +48,7 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relo
      * In particular, we reach at the "formula":
      * `nextInstructionAddress = offsetToPatch + 4`
      */
-    int nextInstructionAddress = offsetToPatch + 4;
+    const int nextInstructionAddress = offsetToPatch + 4;
 
     /**
      * Suppose your code "wants to" jump to a `targetAddress` - here, the
@@ -105,7 +105,7 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relo
      *
      * `rel32 = targetAddress - nextInstructionAddress`
      */
-    int rel32 = targetAddress - nextInstructionAddress;
+    const int rel32 = targetAddress - nextInstructionAddress;
 
     emitIntegerInHex(code, &offsetToPatch, rel32);
   }

@@ -9,11 +9,11 @@
 typedef int (*funcp)();
 
 /**
- * Maps each line in `.sbas` file to its offset in the machine code buffer
+ * Maps each line in a SBas file to its offset in the machine code buffer
  *
  * Fields:
- * - line: line in `.sbas` file
- * - offset: start of the line's instructions in the buffer
+ * - `line`: line in the text file (1-indexed)
+ * - `offset`: start of the its instructions in the machine code buffer
  */
 typedef struct {
   unsigned line;
@@ -21,28 +21,28 @@ typedef struct {
 } LineTable;
 
 /**
- * An entry for a linking step fixup. Maps the offset to be patched
- * to the desired line to jump to.
+ * An entry for a linking step fixup.
+ * Maps the offset to be patched to the desired line to jump to.
  *
  * Fields:
- * - `offset`: its position in the buffer
- * - `targetLine`: line to jump to
+ * - `offset`: index 0 of the 4 zero placeholder bytes that should be patched
+ * - `targetLine`: the line whose relative offset to the next instruction should be filled in
  */
 typedef struct {
   int offset;
   unsigned targetLine;
 } RelocationTable;
 
-
 /**
- * @brief Intermediate Representation of an x86-64 Machine Instruction.
- * * This struct serves as a "filling form" for the `emit_instruction` function.
- * It abstracts away the bit-packing required for the Prefix, ModR/M, 
- * SIB, and Displacement bytes.
+ * @brief An abstraction of a x86-64 machine code instruction:
+ *
+ * it serves like a "filling form" for the callers of the `emit_instruction` function,
+ * abstracting away the required bit-packing for the REX Prefix, ModRM,
+ * SIB, and displacement bytes.
  */
 typedef struct {
   /** The base operation code
-   * If > 0xFF, the emitter automatically handles the endianness 
+   * If > 0xFF, the emitter automatically handles the endianness
    * (emitting high byte then low byte).
    */
   unsigned int opcode;
@@ -75,7 +75,7 @@ typedef struct {
 
   /**
    * Bits 2-0 of ModRM.
-   * Specifies either the source register 
+   * Specifies either the source register
    * or the base register for memory access
    */
   unsigned char rm;
@@ -90,7 +90,7 @@ typedef struct {
    * -8(%rbp)
    * Processed as an 8-bit signed integer.
    */
-  int displacement;        
+  int displacement;
 
   /**
    * Enables emission of immediate bytes at the end of an instruction.
