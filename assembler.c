@@ -26,7 +26,7 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst);
 static void emit_prologue(unsigned char code[], int* pos);
 static void save_callee_saved_registers(unsigned char code[], int* pos);
 static void emit_return_value(unsigned char code[], int* pos, Operand* returnSymbol);
-static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol, const char retFound, int* cleanupOffset);
+static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol, char* retFound, int* cleanupOffset);
 static void emit_attribution(unsigned char code[], int* pos, Operand* dest, Operand* source);
 static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* dest, Operand* lhs, char op, Operand* rhs);
 static void emit_cmp(unsigned char code[], int* pos, Operand* op);
@@ -47,6 +47,7 @@ typedef enum {
   OP_IMUL_REG_BY_RM_STORE_IN_REG = (0x0F << 8) | 0xAF,  // multiply r/m 32/64 by r32/64 and store in r32/64 (r32/64 := r/m 32/64 * r32/64 )
   OP_IMUL_RM_BY_BYTE_STORE_IN_REG = 0x6B,               // multiply r/m 32/64 by imm8 and store in r32/64
   OP_IMUL_RM_BY_INT_STORE_IN_REG = 0x69,                // multiply r/m 32/64 by imm32 and store in r32/64
+  OP_JMP = 0xE9,                                        // unconditional jump to `rel32`
   OP_LEAVE = 0xc9,                                      // movq %rbp, %rsp ; popq %rbp
   OP_RET = 0xc3,                                        // set %rip to address on top of stack, usually placed there by a `call`
 } Opcode;
@@ -146,12 +147,11 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
           return -1;
         }
 
-        emit_return(code, &pos, &returnSymbol, retFound, &cleanupOffset);
+        emit_return(code, &pos, &returnSymbol, &retFound, &cleanupOffset);
 
-        if (!retFound) {
-          retFound = 1;  // actually "find" the 1st ret after we've written the cleanup routine
-        } else {
-          code[pos++] = 0xE9;  // jmp rel32
+        // if a 'ret' has already been found, further ones will just jump to the stack cleanup address
+        if (retFound) {
+          code[pos++] = OP_JMP;
 
           // request relocation to jump to `cleanupOffset` during linking
           rt[*relocCount].offset = pos;
@@ -159,10 +159,10 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
           (*relocCount)++;
 
           // Emit 4-byte placeholder for 32-bit offset
-          code[pos++] = 0x00;
-          code[pos++] = 0x00;
-          code[pos++] = 0x00;
-          code[pos++] = 0x00;
+          code[pos++] = 0;
+          code[pos++] = 0;
+          code[pos++] = 0;
+          code[pos++] = 0;
         }
 
         break;
@@ -247,10 +247,10 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
         (*relocCount)++;
 
         // Emit 4-byte placeholder for 32-bit offset
-        code[pos++] = 0x00;
-        code[pos++] = 0x00;
-        code[pos++] = 0x00;
-        code[pos++] = 0x00;
+        code[pos++] = 0;
+        code[pos++] = 0;
+        code[pos++] = 0;
+        code[pos++] = 0;
 
         break;
       }
@@ -454,13 +454,14 @@ static void emit_epilogue(unsigned char code[], int* pos) {
  * @param code buffer to write machine code
  * @param pos pointer to the current offset at the buffer
  * @param returnSymbol pointer to `Operand` struct holding return value and type
- * @param retFound flag that marks if this is the first `ret` found or subsequent ones
+ * @param retFound pointer to flag that marks if this is the first `ret` found
  * @param cleanupOffset pointer to integer where the function will write stack cleanup address if `retFound` is true
  */
-static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol, const char retFound, int* cleanupOffset) {
+static void emit_return(unsigned char code[], int* pos, Operand* returnSymbol, char* retFound, int* cleanupOffset) {
   emit_return_value(code, pos, returnSymbol);
 
-  if (!retFound) {
+  if (!*retFound) {
+    *retFound = 1;
     *cleanupOffset = *pos;  // stack cleanup starts here: we'll write cleanup bytes next up
     restore_callee_saved_registers(code, pos);
     emit_epilogue(code, pos);
