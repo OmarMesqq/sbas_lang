@@ -83,7 +83,27 @@ char sbasLink(unsigned char* code, LineTable* lt, RelocationTable* rt, int* relo
      * `someValue = targetAddress - nextInstructionAddress`
      *
      * Obviously, this value can be negative, allowing the instruction pointer to
-     * go "back and forth" in the program's text section.
+     * go "back and forth" in the program's text section. For 32-bit integers,
+     * the span of possible values is divided in two ranges:
+     * - `0 to +2,147,483,647` (00000000 to 7FFFFFFF in hex)
+     * - `-2,147,483,648 to -1` (80000000 to FFFFFFFF in hex)
+     *
+     * In the first case, we have a forward jump where the CPU adds the offset
+     * to the IP, incrementing it and landing "ahead" of the current instruction.
+     *
+     * Due to two's complement, the logic is the same for the latter case.
+     * If the most significant bit is 1, meaning the most significant byte
+     * is in the range 8 to F, we're dealing with a negative number.
+     *
+     * If we wanted to find its absolute value:
+     * 1. flip its bits: `~offset`
+     * 2. add one: `offset + 1`
+     *
+     * In reality, the CPU doesn't do this and then subtract the number's magnitude.
+     * Rather, it simply adds the integer to the next instruction address and any overflowing
+     * `1`'s are discarded. The final value "rolls over" so that the offset to be added
+     * to IP is actually less than the value it is at right now. Therefore, the IP
+     * is decremented, landing at an instruction "behind" the current one.
      *
      * Finally, since `someValue` is relative (not absolute!) and is a difference
      * between two signed integers (32 bit wide), we call it `rel32`, thus
