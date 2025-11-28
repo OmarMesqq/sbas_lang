@@ -250,8 +250,8 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
   }
 
 #ifdef DEBUG
-  printf("sbasCompile: processed %d lines, writing %d bytes in buffer\n", line - 1, pos);
-  printf("sbasCompile: %d lines were patched\n", *relocCount);
+  printf("sbasAssemble: processed %d lines, writing %d bytes in buffer\n", line - 1, pos);
+  printf("sbasAssemble: found %d lines that should be patched\n", *relocCount);
   printLineTable(lt, line);
   printRelocationTable(rt, *relocCount);
 #endif
