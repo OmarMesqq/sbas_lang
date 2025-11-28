@@ -219,18 +219,13 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
 
         op.type = 'v';
         op.value = variableIndex;
+        
         emit_cmp(code, &pos, &op);
-
-        // TODO: optimization? short jumps such as those in tight loops only use 2 bytes:
-        // 0x7E + 1 byte offset
-        // https://www.felixcloutier.com/x86/jcc
-
         emit_near_jump(code, &pos);
 
         // Mark current line to be resolved in patching step
         rt[*relocCount].targetLine = targetLine;
         rt[*relocCount].offset = pos;
-        rt[*relocCount].sourceLine = line;
         (*relocCount)++;
 
         // Emit 4-byte placeholder

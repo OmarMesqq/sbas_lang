@@ -21,16 +21,14 @@ typedef struct {
 } LineTable;
 
 /**
- * An entry for a linking step fixup. Holds the line requesting the jump,
- * its offset in the buffer and the desired line to jump to.
+ * An entry for a linking step fixup. Maps the offset to be patched
+ * to the desired line to jump to.
  *
  * Fields:
- * - `sourceLine`: line currently parsed that asked for a jump
  * - `offset`: its position in the buffer
  * - `targetLine`: line to jump to
  */
 typedef struct {
-  unsigned sourceLine;
   int offset;
   unsigned targetLine;
 } RelocationTable;
@@ -90,8 +88,7 @@ typedef struct {
   /**
    * The offset added to the base address stored in a register, for instance
    * -8(%rbp)
-   * Currently processed as an 8-bit signed integer.
-   * TODO: support larger jumps?
+   * Processed as an 8-bit signed integer.
    */
   int displacement;        
 
