@@ -693,16 +693,17 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
     needs_rex = 1;
   }
 
-  if (inst->is_imm_mov) {
-    // Optimized `mov` for immediate values.
-    // Only REX.B may be necessary, which is the case when
-    // the source register is an extended one (8 <= rd <= 15)
-    if (inst->imm_mov_rd > 7) {
-      rex |= 0x01;
-      needs_rex = 1;
-    }
-  } else if (inst->isCmp) {
-    if (inst->rm > 7) {
+  /**
+   * `mov $imm, reg` and `cmp $0, reg` instructions
+   * eventually need only REX.B as its destinations
+   * aren't registers and the instructions default to
+   * 32-bit mode
+   */
+  if (inst->is_imm_mov || inst->isCmp) {
+    // the only scenario which REX.B is needed
+    // is when accessing extended registers/
+    // those that have IDs greater than seven
+    if (inst->imm_mov_rd > 7 || inst->rm > 7) {
       rex |= 0x01;
       needs_rex = 1;
     }
