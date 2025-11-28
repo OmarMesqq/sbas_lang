@@ -86,11 +86,9 @@ typedef struct {
   unsigned char use_disp;
 
   /**
-   * The offset added to the base address stored in a register, for instance
-   * -8(%rbp)
-   * Processed as an 8-bit signed integer.
+   * The small offset added to the base address stored in a register, for instance -8(%rbp)
    */
-  int displacement;
+  signed char displacement;
 
   /**
    * Enables emission of immediate bytes at the end of an instruction.

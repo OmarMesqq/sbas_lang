@@ -754,7 +754,6 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
 
   // Memory offsets handling
   if (inst->use_disp) {
-    // Treat `int displacement` as an 8-bit integer
     code[(*pos)++] = inst->displacement & 0xFF;
   }
 
