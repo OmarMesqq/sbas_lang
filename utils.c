@@ -136,22 +136,3 @@ void printRelocationTable(RelocationTable* rt, int relocCount) {
 void compilationError(const char* msg, int line) {
   fprintf(stderr, "%s[line %d in .sbas file]: %s%s\n", RED, line, msg, RESET_COLOR);
 }
-
-/**
- * Attempts to create a file of name `filename`.
- */
-FILE* createFile(const char* filename) {
-  if (!filename) return NULL;
-  FILE* fp = fopen(filename, "w");
-  if (!fp) return NULL;
-  return fp;
-}
-
-/**
- * Attempts to write the contents of `buf` to a file `f`
- * Ignores errors
- */
-void writeToFile(unsigned char* buf, size_t size, FILE* f) {
-  if (!f) return;
-  fwrite(buf, sizeof(unsigned char), size, f);
-}
