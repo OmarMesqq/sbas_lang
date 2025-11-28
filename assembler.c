@@ -47,7 +47,8 @@ typedef enum {
   OP_IMUL_REG_BY_RM_STORE_IN_REG = (0x0F << 8) | 0xAF,  // multiply r/m 32/64 by r32/64 and store in r32/64 (r32/64 := r/m 32/64 * r32/64 )
   OP_IMUL_RM_BY_BYTE_STORE_IN_REG = 0x6B,               // multiply r/m 32/64 by imm8 and store in r32/64
   OP_IMUL_RM_BY_INT_STORE_IN_REG = 0x69,                // multiply r/m 32/64 by imm32 and store in r32/64
-  OP_JMP = 0xE9,                                        // unconditional jump to `rel32`
+  OP_JMP_REL32 = 0xE9,                                  // unconditional jump to 32-bit offset
+  OP_JLE_REL32 = 0x0F << 8 | 0x8E,                      // jump if less or equal to 32-bit offset
   OP_LEAVE = 0xc9,                                      // movq %rbp, %rsp ; popq %rbp
   OP_RET = 0xc3,                                        // set %rip to address on top of stack, usually placed there by a `call`
 } Opcode;
@@ -151,7 +152,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
 
         // if a 'ret' has already been found, further ones will just jump to the stack cleanup address
         if (retFound) {
-          code[pos++] = OP_JMP;
+          code[pos++] = OP_JMP_REL32;
 
           // request relocation to jump to `cleanupOffset` during linking
           rt[*relocCount].offset = pos;
@@ -612,7 +613,7 @@ static void emit_arithmetic_operation(unsigned char code[], int* pos, Operand* d
     switch (op) {
       case '+':
       case '-': {
-        // ADD and SUB share the same opcodes (0x83 for byte, 0x81 for int)
+        // ADD and SUB share the same opcodes
         arithmeticOperation.opcode = fitsInByte ? OP_IMM8_ARITHM_OP : OP_IMM32_ARITHM_OP;
 
         // Only difference lies in the reg field:
@@ -674,8 +675,9 @@ static void emit_cmp(unsigned char code[], int* pos, Operand* op) {
  * it allows jumping to pretty much anywhere in code (+- 2GB).
  */
 static void emit_near_jump(unsigned char code[], int* pos) {
-  code[(*pos)++] = 0x0F;
-  code[(*pos)++] = 0x8E;
+  Instruction jleRel32 = {0};
+  jleRel32.opcode = OP_JLE_REL32;
+  emit_instruction(code, pos, &jleRel32);
 }
 
 /**
@@ -773,7 +775,7 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
     code[(*pos)++] = rex;
   }
 
-  // Handle 2-byte opcodes (like imul's 0x0FAF)
+  // Handle 2-byte opcodes
   if (inst->opcode > 0xFF) {
     code[(*pos)++] = (inst->opcode >> 8) & 0xFF;  // High byte
     code[(*pos)++] = inst->opcode & 0xFF;         // Low byte
