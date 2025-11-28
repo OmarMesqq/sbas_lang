@@ -3,7 +3,7 @@ OUTPUT := /tmp/sbas
 TEST_OUTPUT := /tmp/sbas_test
 
 debug:
-	gcc -g -Wall -Wextra main.c sbas.c utils.c assembler.c linker.c -o $(OUTPUT) -lm
+	gcc -g -no-pie -Wall -Wextra main.c sbas.c utils.c assembler.c linker.c -o $(OUTPUT) -lm
 
 release:
 	gcc -O3 -Wall -Wextra  main.c sbas.c utils.c assembler.c linker.c -o $(OUTPUT) -lm
