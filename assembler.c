@@ -46,8 +46,8 @@ typedef enum {
   OP_IMUL_REG_BY_RM_STORE_IN_REG = (0x0F << 8) | 0xAF,  // multiply r/m 32/64 by r32/64 and store in r32/64 (r32/64 := r/m 32/64 * r32/64 )
   OP_IMUL_RM_BY_BYTE_STORE_IN_REG = 0x6B,               // multiply r/m 32/64 by imm8 and store in r32/64
   OP_IMUL_RM_BY_INT_STORE_IN_REG = 0x69,                // multiply r/m 32/64 by imm32 and store in r32/64
-  OP_LEAVE = 0xc9,
-  OP_RET = 0xc3,
+  OP_LEAVE = 0xc9,                                      // movq %rbp, %rsp ; popq %rbp
+  OP_RET = 0xc3,                                        // set %rip to address on top of stack, usually placed there by a `call`
 } Opcode;
 
 /**
