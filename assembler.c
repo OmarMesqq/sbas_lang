@@ -219,7 +219,7 @@ char sbasAssemble(unsigned char* code, FILE* f, LineTable* lt, RelocationTable* 
 
         op.type = 'v';
         op.value = variableIndex;
-        
+
         emit_cmp(code, &pos, &op);
         emit_near_jump(code, &pos);
 
@@ -633,9 +633,8 @@ static void emit_near_jump(unsigned char code[], int* pos) {
 }
 
 /**
- * Unified Register Mapper.
- * Returns the Full Hardware Index (0-15).
- * * Supports:
+ * Maps SBas variables and parameters to x86's FULL hardware index (0-15).
+ *
  * - Locals ('v'): v1(RBX), v2(R12), v3(R13), v4(R14), v5(R15)
  * - Params ('p'): p1(EDI), p2(ESI), p3(EDX)
  */
@@ -674,34 +673,32 @@ static int get_hardware_reg_index(char type, int idx) {
 }
 
 /**
- * A x86-64 instruction is made of:
- * - prefix (optional)
- * - opcode
- * - ModR/M (optional)
- * - payload (optional): immediates or memory offsets
+ * Emits an x86-64 instruction at offset `pos` in buffer `code`.
+ * Expects the already filled out `Instruction` struct "form".
  */
 static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) {
-  /** REX byte emission:
-   * top 4 bits are fixed: 0100 (bin) / 4 (hex)
+  /** The REX prefix byte
+   * top 4 bits are fixed: `0100`
    * bottom 4 are the bits W, R, X, and B
-   * W extends instruction to 64 bits
-   * R extends source register
-   * B extends destination register
+   * - W extends instruction to 64 bits
+   * - R extends source register
+   * - B extends destination register
    */
   unsigned char rex = 0x40;
   char needs_rex = 0;
 
-  // REX.W: Promotion to 64-bit width
+  // REX.W: promotes the instruction to 64-bit width
   if (inst->is_64bit) {
     rex |= 0x08;
     needs_rex = 1;
   }
 
   if (inst->is_imm_mov) {
-    // Case: Opcode embedding (e.g. 0xB8 + reg)
-    // We only need REX.B if the register index is 8-15 (r8-r15)
+    // Optimized `mov` for immediate values.
+    // Only REX.B may be necessary, which is the case when
+    // the source register is an extended one (8 <= rd <= 15)
     if (inst->imm_mov_rd > 7) {
-      rex |= 0x01;  // REX.B
+      rex |= 0x01;
       needs_rex = 1;
     }
   } else if (inst->isCmp) {
@@ -710,14 +707,14 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
       needs_rex = 1;
     }
   } else {
-    // REX.R: Extension for the 'reg' field (source)
+    // REX.R: Extension for the `reg` field (source)
     // used for registers of id 8-15
     if (inst->use_modrm && inst->reg > 7) {
       rex |= 0x04;
       needs_rex = 1;
     }
 
-    // REX.B: Extension for the 'r/m' field (destination)
+    // REX.B: Extension for the `r/m` field (destination)
     // used for registers of id 8-15
     if (inst->use_modrm && inst->rm > 7) {
       rex |= 0x01;
@@ -736,7 +733,10 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
   } else {
     unsigned int combinedOpcode = inst->opcode;
 
+    // handle instructions that embed the register id `rd` in itself
     if (inst->is_imm_mov) {
+      // 7(10) = 111 (2)
+      // extract lower 3 bits
       combinedOpcode += (inst->imm_mov_rd & 7);
     }
     code[(*pos)++] = (unsigned char)combinedOpcode;
@@ -745,32 +745,30 @@ static void emit_instruction(unsigned char code[], int* pos, Instruction* inst) 
   if (inst->use_modrm) {
     unsigned char modrm = 0;
 
-    modrm |= (inst->mod << 6);
-    modrm |= ((inst->reg & 7) << 3);
-    modrm |= (inst->rm & 7);
+    modrm |= (inst->mod << 6);        // put `mod` in bits 7 and 6
+    modrm |= ((inst->reg & 7) << 3);  // get `reg`'s 3 bits and place them in bits 5, 4, 3
+    modrm |= (inst->rm & 7);          // keep `rm`'s 3 lower bits in their exact spot: 2, 1, 0
 
     code[(*pos)++] = modrm;
   }
 
   // Memory offsets handling
   if (inst->use_disp) {
-    // For now, assuming 8-bit displacement (signed char) as used in your stack
-    code[(*pos)++] = (unsigned char)(inst->displacement & 0xFF);
+    // Treat `int displacement` as an 8-bit integer
+    code[(*pos)++] = inst->displacement & 0xFF;
   }
 
   // Immediate values handling
   if (inst->use_imm) {
     if (inst->imm_size == 4) {
-      // Use your existing helper for 32-bit numbers
       emitIntegerInHex(code, pos, inst->immediate);
     } else {
-      // 8-bit immediate
-      code[(*pos)++] = (unsigned char)(inst->immediate & 0xFF);
+      code[(*pos)++] = inst->immediate & 0xFF;
     }
   }
 
-  // For now, support only iflez (compares against zero, so hardcode it)
+  // The only conditional jump is `iflez`, which checks against zero, so hardcode it here
   if (inst->isCmp) {
-    code[(*pos)++] = 0x00;
+    code[(*pos)++] = 0;
   }
 }
